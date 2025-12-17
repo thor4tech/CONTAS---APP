@@ -1,0 +1,7 @@
+{
+  "name": "Gestor Financeiro Pro",
+  "description": "Sistema de gestão financeira completo baseado na lógica de planilhas, com controle de entradas, saídas, ferramentas, gastos fixos e metas de faturamento.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
