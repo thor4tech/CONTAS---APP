@@ -290,16 +290,16 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
             <button onClick={handleNextMonth} className="p-3 hover:bg-white rounded-full transition-all text-slate-500"><ChevronRight size={18} /></button>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 md:gap-2">
              <button 
                onClick={() => setShowValues(!showValues)} 
                className={`p-2.5 rounded-2xl transition-all border ${showValues ? 'bg-slate-50 text-slate-400 border-slate-100 hover:text-blue-600' : 'bg-blue-600 text-white border-blue-500 shadow-lg shadow-blue-200'}`}
                title={showValues ? "Ocultar Valores" : "Mostrar Valores"}
              >
-               {showValues ? <Eye size={20}/> : <EyeOff size={20}/>}
+               {showValues ? <Eye size={18}/> : <EyeOff size={18}/>}
              </button>
-             <button onClick={() => setIsSettingsOpen(true)} className="p-2.5 bg-slate-50 border border-slate-100 text-slate-400 rounded-2xl hover:text-blue-600 hover:bg-white transition-all"><Settings size={20}/></button>
-             <button onClick={() => signOut(auth)} className="p-2.5 bg-rose-50 text-rose-500 rounded-2xl hover:bg-rose-600 hover:text-white transition-all shadow-sm"><LogOut size={20}/></button>
+             <button onClick={() => setIsSettingsOpen(true)} className="p-2.5 bg-slate-50 border border-slate-100 text-slate-400 rounded-2xl hover:text-blue-600 hover:bg-white transition-all shadow-sm"><Settings size={18}/></button>
+             <button onClick={() => signOut(auth)} className="hidden md:flex p-2.5 bg-rose-50 text-rose-500 rounded-2xl hover:bg-rose-600 hover:text-white transition-all shadow-sm"><LogOut size={18}/></button>
           </div>
         </div>
       </header>

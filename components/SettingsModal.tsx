@@ -1,7 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { AssetMetadata, UserProfile, PlanId } from '../types';
-import { X, Plus, Trash2, Save, Landmark, CreditCard, Settings, User as UserIcon, Building2, Target, Crown, ShieldCheck, Zap, ExternalLink, Star, TestTube2, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { auth } from '../lib/firebase';
+import { signOut } from 'firebase/auth';
+import { X, Plus, Trash2, Save, Landmark, CreditCard, Settings, User as UserIcon, Building2, Target, Crown, ShieldCheck, Zap, ExternalLink, Star, TestTube2, CheckCircle2, AlertCircle, Loader2, LogOut } from 'lucide-react';
 import { testWebhookIntegration, KIWIFY_LINKS, TEST_EMAILS } from '../lib/subscription';
 
 interface Props {
@@ -46,7 +48,7 @@ const SettingsModal: React.FC<Props> = ({ isOpen, onClose, userProfile, userEmai
     if (success) {
       setWebhookResult(prev => ({ ...prev, [plan]: 'success' }));
       
-      // Conforme solicitado: Muda o plano do usuário imediatamente no sistema após o sucesso do disparo
+      // Muda o plano do usuário imediatamente no sistema após o sucesso do disparo
       onSaveProfile({
         ...userProfile,
         planId: plan,
@@ -91,7 +93,7 @@ const SettingsModal: React.FC<Props> = ({ isOpen, onClose, userProfile, userEmai
               <Settings size={28} />
             </div>
             <div>
-              <h3 className="text-xl md:text-2xl font-black text-slate-900 tracking-tighter">Painel de Controle</h3>
+              <h3 className="text-xl md:text-2xl font-black text-slate-900 tracking-tighter">Configurações</h3>
               <p className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mt-1">Identidade e Gestão</p>
             </div>
           </div>
@@ -104,7 +106,7 @@ const SettingsModal: React.FC<Props> = ({ isOpen, onClose, userProfile, userEmai
            <button onClick={() => setActiveTab('planos')} className={`flex-1 py-4 md:py-6 text-[9px] md:text-[11px] font-black uppercase tracking-[0.3em] border-b-4 transition-all ${activeTab === 'planos' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-slate-400'}`}>Assinatura</button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-8 md:p-12 space-y-10 bg-white">
+        <div className="flex-1 overflow-y-auto p-8 md:p-12 space-y-10 bg-white no-scrollbar">
           {activeTab === 'perfil' && (
             <div className="space-y-8 animate-in slide-in-from-left-4 duration-500">
                <div className="space-y-4">
@@ -124,6 +126,15 @@ const SettingsModal: React.FC<Props> = ({ isOpen, onClose, userProfile, userEmai
                     <span className="absolute left-6 top-1/2 -translate-y-1/2 text-indigo-300 font-mono font-black">R$</span>
                     <input value={localMeta || ''} onChange={e => setLocalMeta(parseFloat(e.target.value) || 0)} type="number" className="w-full bg-indigo-50 border-2 border-indigo-100 rounded-[24px] pl-16 pr-8 py-5 focus:border-indigo-500 outline-none font-black text-indigo-700 text-xl font-mono tracking-tighter" placeholder="Ex: 30000" />
                   </div>
+               </div>
+               
+               <div className="pt-6 border-t border-slate-100">
+                 <button 
+                   onClick={() => signOut(auth)} 
+                   className="w-full py-4 flex items-center justify-center gap-3 bg-rose-50 text-rose-500 rounded-2xl hover:bg-rose-600 hover:text-white transition-all font-black text-[10px] uppercase tracking-[0.3em] border border-rose-100 shadow-sm"
+                 >
+                   <LogOut size={18} /> Encerrar Sessão
+                 </button>
                </div>
             </div>
           )}
@@ -189,7 +200,6 @@ const SettingsModal: React.FC<Props> = ({ isOpen, onClose, userProfile, userEmai
                           </button>
                         ))}
                       </div>
-                      <p className="text-[8px] font-bold text-white/30 uppercase tracking-widest mt-3 text-center">O plano será alterado instantaneamente no sistema ao clicar.</p>
                     </div>
                   )}
                </div>
@@ -236,8 +246,8 @@ const SettingsModal: React.FC<Props> = ({ isOpen, onClose, userProfile, userEmai
         </div>
 
         <div className="p-8 md:p-12 bg-slate-50 border-t border-slate-100 flex gap-4 md:gap-6">
-          <button onClick={onClose} className="flex-1 py-4 md:py-6 font-black text-slate-400 uppercase text-[10px] tracking-[0.3em]">Cancelar</button>
-          <button onClick={handleSaveAll} className="flex-2 py-4 md:py-6 bg-indigo-600 text-white font-black uppercase text-[10px] tracking-[0.3em] rounded-[24px] shadow-2xl flex items-center justify-center gap-3"><Save size={20}/> Salvar Configurações</button>
+          <button onClick={onClose} className="flex-1 py-4 md:py-6 font-black text-slate-400 uppercase text-[10px] tracking-[0.3em] hover:text-slate-600 transition-all">Cancelar</button>
+          <button onClick={handleSaveAll} className="flex-[2] py-4 md:py-6 bg-indigo-600 text-white font-black uppercase text-[10px] tracking-[0.3em] rounded-[24px] shadow-2xl flex items-center justify-center gap-3 hover:bg-indigo-700 active:scale-95 transition-all"><Save size={20}/> Salvar Alterações</button>
         </div>
       </div>
     </div>
