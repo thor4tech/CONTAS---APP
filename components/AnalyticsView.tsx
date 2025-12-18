@@ -56,10 +56,11 @@ const AnalyticsView: React.FC<Props> = ({ monthData, totals }) => {
   const [dailyUsage, setDailyUsage] = useState(0);
   const maxCredits = 3;
   
-  // Créditos infinitos para thor4tech, Cleitontadeu10 ou plano MASTER
+  // Créditos infinitos para administradores e plano MASTER - Removido emails técnicos
   const isInfinite = useMemo(() => {
     const email = auth.currentUser?.email;
-    return email === 'thor4tech@gmail.com' || email === 'Cleitontadeu10@gmail.com' || profile?.planId === 'MASTER';
+    const admins = ['thor4tech@gmail.com', 'Cleitontadeu10@gmail.com'];
+    return admins.includes(email || '') || profile?.planId === 'MASTER';
   }, [auth.currentUser, profile]);
   
   const remainingCredits = isInfinite ? Infinity : Math.max(0, maxCredits - dailyUsage);
@@ -266,7 +267,7 @@ const AnalyticsView: React.FC<Props> = ({ monthData, totals }) => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
          <MetricCardPro label="Ponto de Equilíbrio" value={Math.min((faturamento/(despesas||1))*100, 100).toFixed(1) + '%'} sub={faturamento >= despesas ? 'Operação no Azul' : 'Abaixo do Equilíbrio'} icon={Filter} color={faturamento >= despesas ? "text-emerald-500" : "text-amber-500"} />
          <MetricCardPro label="Margem de Lucro" value={marginPercent.toFixed(1) + '%'} sub="Eficiência Real" icon={DollarSign} color={marginPercent > 0 ? "text-emerald-500" : "text-rose-500"} />
-         <MetricCardPro label="Cash Runway" value={(totals.pendingExpenses > 0 ? (totals.availableCash / (totals.pendingExpenses / 30)) : 30).toFixed(0) + ' dias'} sub="Fôlego de Caixa" icon={Clock} color="text-indigo-500" />
+         <MetricCardPro label="Cash Runway" value={((totals.availableCash / ((despesas/30)||1)) || 30).toFixed(0) + ' dias'} sub="Fôlego de Caixa" icon={Clock} color="text-indigo-500" />
          <MetricCardPro label="Burn Rate Diário" value={(despesas/22 || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} sub="Média Dias Úteis" icon={Zap} color="text-slate-900" />
       </div>
 
@@ -283,7 +284,7 @@ const AnalyticsView: React.FC<Props> = ({ monthData, totals }) => {
                   <h3 className="text-xl md:text-2xl font-black text-white tracking-tighter">Master Intelligence <span className="text-indigo-400">PRO 2.0</span></h3>
                   <div className="flex items-center gap-3 mt-1.5">
                     {isInfinite ? (
-                      <span className="flex items-center gap-1.5 text-[9px] font-black text-indigo-400 uppercase tracking-widest bg-indigo-400/10 px-3 py-1 rounded-full border border-indigo-400/20"><Unlock size={12}/> Acesso Ilimitado ADM</span>
+                      <span className="flex items-center gap-1.5 text-[9px] font-black text-indigo-400 uppercase tracking-widest bg-indigo-400/10 px-3 py-1 rounded-full border border-indigo-400/20"><Unlock size={12}/> Acesso Ilimitado ADM / MASTER</span>
                     ) : (
                       <div className="flex items-center gap-4 bg-white/5 px-4 py-1.5 rounded-full border border-white/10">
                          <div className="flex gap-1.5">

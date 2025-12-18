@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
-import { AssetMetadata, UserProfile } from '../types';
+import { AssetMetadata, UserProfile, PlanId } from '../types';
 import { X, Plus, Trash2, Save, Landmark, CreditCard, Settings, User as UserIcon, Building2, Target, Crown, ShieldCheck, Zap, ExternalLink, Star, TestTube2, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
-import { testWebhookIntegration, KIWIFY_LINKS } from '../lib/subscription';
+import { testWebhookIntegration, KIWIFY_LINKS, TEST_EMAILS } from '../lib/subscription';
 
 interface Props {
   isOpen: boolean;
@@ -19,8 +19,11 @@ const SettingsModal: React.FC<Props> = ({ isOpen, onClose, userProfile, userEmai
   const [localMeta, setLocalMeta] = useState(userProfile.defaultMeta || 0);
   const [localAssets, setLocalAssets] = useState<AssetMetadata[]>(userProfile.globalAssets || []);
   
-  const [webhookTesting, setWebhookTesting] = useState(false);
-  const [webhookResult, setWebhookResult] = useState<'success' | 'error' | null>(null);
+  const [webhookTesting, setWebhookTesting] = useState<PlanId | null>(null);
+  const [webhookResult, setWebhookResult] = useState<{[key in PlanId]?: 'success' | 'error'}>({});
+
+  // Emails autorizados a ver as funções de teste
+  const isTester = TEST_EMAILS.includes(userEmail.toLowerCase());
 
   useEffect(() => {
     if (isOpen) {
@@ -28,24 +31,34 @@ const SettingsModal: React.FC<Props> = ({ isOpen, onClose, userProfile, userEmai
       setLocalMeta(userProfile.defaultMeta || 0);
       setLocalName(userProfile.name);
       setLocalCompany(userProfile.company);
-      setWebhookResult(null);
+      setWebhookResult({});
     }
   }, [isOpen, userProfile]);
 
   if (!isOpen) return null;
 
-  const handleTestWebhook = async () => {
-    setWebhookTesting(true);
-    setWebhookResult(null);
-    const success = await testWebhookIntegration(userEmail);
-    setWebhookResult(success ? 'success' : 'error');
-    setWebhookTesting(false);
+  const handleTestWebhook = async (plan: PlanId) => {
+    setWebhookTesting(plan);
+    setWebhookResult(prev => ({ ...prev, [plan]: undefined }));
     
-    // Se o sinal foi enviado, agora cabe ao n8n atualizar o banco.
-    // O onSnapshot no App.tsx cuidará de atualizar a UI assim que o dado mudar no Firestore.
+    const success = await testWebhookIntegration(userEmail, plan);
+    
     if (success) {
-      setTimeout(() => setWebhookResult(null), 5000);
+      setWebhookResult(prev => ({ ...prev, [plan]: 'success' }));
+      
+      // Conforme solicitado: Muda o plano do usuário imediatamente no sistema após o sucesso do disparo
+      onSaveProfile({
+        ...userProfile,
+        planId: plan,
+        subscriptionStatus: 'ACTIVE'
+      });
+
+      setTimeout(() => setWebhookResult(prev => ({ ...prev, [plan]: undefined })), 5000);
+    } else {
+      setWebhookResult(prev => ({ ...prev, [plan]: 'error' }));
     }
+    
+    setWebhookTesting(null);
   };
 
   const handleAddAsset = (type: 'bank' | 'card') => {
@@ -150,39 +163,39 @@ const SettingsModal: React.FC<Props> = ({ isOpen, onClose, userProfile, userEmai
 
           {activeTab === 'planos' && (
             <div className="space-y-8 animate-in zoom-in-95 duration-500">
-               <div className="p-8 bg-slate-900 rounded-[32px] text-white flex flex-col md:flex-row justify-between items-center gap-6 relative overflow-hidden">
-                  <div className="relative z-10 w-full md:w-auto">
-                     <span className="text-[9px] font-black text-white/40 uppercase tracking-widest block mb-2">Plano Atual</span>
+               <div className="p-8 bg-slate-900 rounded-[32px] text-white flex flex-col justify-between items-start gap-6 relative overflow-hidden">
+                  <div className="relative z-10 w-full">
+                     <span className="text-[9px] font-black text-white/40 uppercase tracking-widest block mb-2">Status da Conta</span>
                      <div className="flex items-center gap-3">
                         {userProfile.subscriptionStatus === 'ACTIVE' ? <ShieldCheck className="text-emerald-400" /> : <Crown className="text-indigo-400" />}
                         <h4 className="text-2xl font-black tracking-tighter uppercase">{userProfile.planId}</h4>
+                        <span className={`px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest border ${userProfile.subscriptionStatus === 'ACTIVE' ? 'bg-emerald-500/10 border-emerald-500/50 text-emerald-400' : 'bg-amber-500/10 border-amber-500/50 text-amber-400'}`}>{userProfile.subscriptionStatus === 'TRIAL' ? 'Teste Grátis' : userProfile.subscriptionStatus}</span>
                      </div>
-                     <span className={`text-[10px] font-black uppercase tracking-widest mt-2 block ${userProfile.subscriptionStatus === 'ACTIVE' ? 'text-emerald-400' : 'text-amber-400'}`}>Status: {userProfile.subscriptionStatus === 'TRIAL' ? 'Período de Teste' : userProfile.subscriptionStatus}</span>
                   </div>
                   
-                  <div className="relative z-10 w-full md:w-auto">
-                    <button 
-                      onClick={handleTestWebhook}
-                      disabled={webhookTesting}
-                      className={`w-full md:w-auto flex items-center justify-center gap-3 px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-all ${webhookResult === 'success' ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' : webhookResult === 'error' ? 'bg-rose-500/20 border-rose-500 text-rose-400' : 'bg-white/10 border-white/20 text-white hover:bg-white/20'}`}
-                    >
-                      {webhookTesting ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : webhookResult === 'success' ? (
-                        <CheckCircle2 size={18} />
-                      ) : webhookResult === 'error' ? (
-                        <AlertCircle size={18} />
-                      ) : (
-                        <TestTube2 size={18} />
-                      )}
-                      {webhookResult === 'success' ? 'Sinal Real Enviado!' : webhookResult === 'error' ? 'Erro no Sinal' : 'Simular Compra Kiwify'}
-                    </button>
-                    <p className="text-[8px] font-bold text-white/30 uppercase tracking-widest mt-2 text-center md:text-right">Aguardando ativação pelo n8n...</p>
-                  </div>
+                  {isTester && (
+                    <div className="relative z-10 w-full p-6 bg-white/5 rounded-3xl border border-white/10">
+                      <h5 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-4 flex items-center gap-2"><TestTube2 size={14}/> Simulador de Ativação Kiwify (Modo Teste)</h5>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        {(['ESSENTIAL', 'PRO', 'MASTER'] as PlanId[]).map(plan => (
+                          <button 
+                            key={plan}
+                            onClick={() => handleTestWebhook(plan)}
+                            disabled={webhookTesting !== null}
+                            className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all ${webhookResult[plan] === 'success' ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' : webhookResult[plan] === 'error' ? 'bg-rose-500/20 border-rose-500 text-rose-400' : 'bg-white/10 border-white/20 text-white hover:bg-white/20'}`}
+                          >
+                            {webhookTesting === plan ? <Loader2 className="w-3 h-3 animate-spin" /> : webhookResult[plan] === 'success' ? <CheckCircle2 size={14} /> : webhookResult[plan] === 'error' ? <AlertCircle size={14} /> : <Zap size={14} />}
+                            {plan}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="text-[8px] font-bold text-white/30 uppercase tracking-widest mt-3 text-center">O plano será alterado instantaneamente no sistema ao clicar.</p>
+                    </div>
+                  )}
                </div>
 
                <div className="grid grid-cols-1 gap-4">
-                  <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">Opções de Upgrade</h4>
+                  <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">Níveis de Comando</h4>
                   
                   <a href={KIWIFY_LINKS.ESSENTIAL} target="_blank" className="flex items-center justify-between p-6 bg-slate-50 rounded-[28px] border-2 border-transparent hover:border-indigo-600 transition-all group">
                      <div>
