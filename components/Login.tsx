@@ -1,15 +1,15 @@
 
 import React, { useState } from 'react';
 import { auth } from '../lib/firebase';
-// Fix: Use modular authentication functions as named exports from firebase/auth
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
-import { Activity, Lock, Mail, ArrowRight, ShieldCheck, Sparkles } from 'lucide-react';
+import { Activity, Lock, Mail, ArrowRight, ShieldCheck, Sparkles, ChevronLeft } from 'lucide-react';
 
 interface Props {
   onLogin: () => void;
+  onBackToLanding: () => void;
 }
 
-const Login: React.FC<Props> = ({ onLogin }) => {
+const Login: React.FC<Props> = ({ onLogin, onBackToLanding }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isRegistering, setIsRegistering] = useState(false);
@@ -22,7 +22,6 @@ const Login: React.FC<Props> = ({ onLogin }) => {
     setError(null);
     try {
       if (isRegistering) {
-        // Fix: Auth modular functions take the auth instance as the first argument
         await createUserWithEmailAndPassword(auth, email, password);
       } else {
         await signInWithEmailAndPassword(auth, email, password);
@@ -37,26 +36,35 @@ const Login: React.FC<Props> = ({ onLogin }) => {
 
   return (
     <div className="min-h-screen bg-[#020617] flex items-center justify-center p-6 relative overflow-hidden">
-      {/* Background de autoridade estratégica */}
+      {/* Background decorativo */}
       <div className="absolute top-0 right-0 w-[1000px] h-[1000px] bg-indigo-600/10 rounded-full -mr-[400px] -mt-[400px] blur-[150px] pointer-events-none"></div>
       <div className="absolute bottom-0 left-0 w-[800px] h-[800px] bg-emerald-600/5 rounded-full -ml-[300px] -mb-[300px] blur-[150px] pointer-events-none"></div>
-      
-      {/* Elementos abstratos de grade */}
       <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-[0.03] pointer-events-none"></div>
+
+      {/* Botão de Voltar para Landing Page */}
+      <button 
+        onClick={onBackToLanding}
+        className="absolute top-6 left-6 md:top-10 md:left-10 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 hover:text-white transition-all group z-50"
+      >
+        <div className="p-2 bg-white/5 rounded-lg border border-white/10 group-hover:bg-indigo-600 transition-all">
+          <ChevronLeft size={16} />
+        </div>
+        <span>Voltar para o início</span>
+      </button>
 
       <div className="w-full max-w-md relative z-10">
         <div className="text-center mb-10">
           <div className="inline-flex p-5 bg-gradient-to-br from-indigo-600 to-indigo-950 rounded-[32px] text-white shadow-[0_20px_50px_rgba(79,70,229,0.3)] mb-6 border border-white/10 group">
             <Activity size={36} className="text-emerald-300 group-hover:scale-110 transition-transform" />
           </div>
-          <h1 className="text-4xl font-black text-white tracking-tighter mb-2">Cria Gestão <span className="text-indigo-400">Pro</span></h1>
+          <h1 className="text-4xl font-black text-white tracking-tighter mb-2 uppercase">Cria Gestão <span className="text-indigo-400">Pro</span></h1>
           <p className="text-[10px] font-black text-indigo-300/40 uppercase tracking-[0.5em]">Master Intelligence Strategic</p>
         </div>
 
         <div className="bg-white/95 backdrop-blur-2xl rounded-[48px] p-10 md:p-12 shadow-[0_50px_100px_rgba(0,0,0,0.5)] border border-white/20">
           <div className="mb-10 text-center md:text-left">
             <h2 className="text-2xl font-black text-slate-900 tracking-tight mb-2 flex items-center justify-center md:justify-start gap-2">
-              {isRegistering ? 'Criar Acesso' : 'Painel Estratégico'} <Sparkles size={20} className="text-indigo-500" />
+              {isRegistering ? 'Teste Grátis 7 Dias' : 'Painel Estratégico'} <Sparkles size={20} className="text-indigo-500" />
             </h2>
             <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">
               {isRegistering ? 'Inicie sua jornada de controle absoluto' : 'Acesse seu centro de comando financeiro'}
@@ -105,7 +113,7 @@ const Login: React.FC<Props> = ({ onLogin }) => {
                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
               ) : (
                 <>
-                  {isRegistering ? 'Cadastrar Agora' : 'Acessar Centro de Comando'}
+                  {isRegistering ? 'Ativar Teste Grátis' : 'Entrar no Sistema'}
                   <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
                 </>
               )}
@@ -117,15 +125,9 @@ const Login: React.FC<Props> = ({ onLogin }) => {
               onClick={() => setIsRegistering(!isRegistering)}
               className="text-[10px] font-black text-slate-400 hover:text-indigo-600 transition-colors uppercase tracking-widest"
             >
-              {isRegistering ? 'Já possui acesso estratégico? Login' : 'Não tem conta? Solicite ao administrador'}
+              {isRegistering ? 'Já possui acesso? Clique aqui' : 'Novo por aqui? Comece o teste grátis'}
             </button>
           </div>
-        </div>
-
-        <div className="mt-12 text-center opacity-40">
-          <p className="text-[9px] font-black text-white uppercase tracking-[0.6em] flex items-center justify-center gap-3">
-             <ShieldCheck size={14} className="text-indigo-400" /> Rafael Torquato MASTER INTELLIGENCE
-          </p>
         </div>
       </div>
     </div>

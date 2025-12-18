@@ -1,0 +1,577 @@
+
+import React, { useState, useEffect, useMemo } from 'react';
+import { auth, db } from '../lib/firebase';
+import { signOut, type User } from 'firebase/auth';
+import { collection, onSnapshot, doc, setDoc, query, deleteDoc, updateDoc, getDoc } from 'firebase/firestore';
+import { MONTHS, DEFAULT_CATEGORIES } from '../constants';
+import { AppState, FinancialData, BaseTransaction, Situation, Category, Partner, UserProfile, AccountItem, CreditCardItem } from '../types';
+import SplitTransactionView from './SplitTransactionView';
+import PartnerManager from './PartnerManager';
+import CalendarView from './CalendarView';
+import TransactionModal from './TransactionModal';
+import CategoryModal from './CategoryModal';
+import SettingsModal from './SettingsModal';
+import AnalyticsView from './AnalyticsView';
+import OnboardingGuide from './OnboardingGuide';
+import ConfirmModal from './ConfirmModal';
+import { 
+  Wallet, ChevronLeft, ChevronRight, LayoutDashboard, 
+  Calendar, List, Palette, Users, Activity, LogOut, 
+  CreditCard, Landmark, ArrowDownCircle, Zap,
+  Settings, ShieldCheck, CreditCard as CardIcon, CheckCircle2,
+  BarChart3, Clock, PiggyBank, Copy, ArrowUpRight, Bell, AlertTriangle, X, Unlock
+} from 'lucide-react';
+import { parseISO, format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+
+interface DashboardProps {
+  user: User;
+}
+
+const Dashboard: React.FC<DashboardProps> = ({ user }) => {
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [isAlertsOpen, setIsAlertsOpen] = useState(false);
+  const [isConfirmDupOpen, setIsConfirmDupOpen] = useState(false);
+  const [dailyUsage, setDailyUsage] = useState(0);
+  
+  const now = useMemo(() => new Date(), []);
+  const initialMonth = MONTHS[now.getMonth()];
+  const initialYear = now.getFullYear();
+  const todayStr = format(now, 'yyyy-MM-dd');
+
+  const [appState, setAppState] = useState<AppState>({
+    currentMonth: initialMonth,
+    currentYear: initialYear,
+    data: [],
+    categories: DEFAULT_CATEGORIES,
+    partners: [],
+    view: 'dashboard',
+    searchTerm: '',
+    statusFilter: 'ALL',
+    aiMinimized: true,
+    userProfile: { name: '', company: 'Minha Empresa', defaultMeta: 0, globalAssets: [] }
+  });
+
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isCatModalOpen, setIsCatModalOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [modalPreType, setModalPreType] = useState<'Receita' | 'Despesa' | undefined>(undefined);
+  const [editingTransaction, setEditingTransaction] = useState<BaseTransaction | undefined>(undefined);
+
+  useEffect(() => {
+    if (!user) return;
+    
+    const unsubData = onSnapshot(query(collection(db, `users/${user.uid}/data`)), 
+      (snap) => {
+        const dataArr = snap.docs.map(d => ({
+          ...d.data(),
+          transactions: Array.isArray(d.data().transactions) ? d.data().transactions : [],
+          balances: d.data().balances || {},
+          cardDetails: d.data().cardDetails || {},
+          reserva: d.data().reserva || 0,
+        } as FinancialData));
+        setAppState(prev => ({ ...prev, data: dataArr }));
+      }
+    );
+
+    const unsubProfile = onSnapshot(doc(db, `users/${user.uid}/profile`, 'settings'), 
+      (docSnap) => {
+        if (docSnap.exists()) {
+          const profile = docSnap.data() as UserProfile;
+          setAppState(prev => ({ 
+            ...prev, 
+            userProfile: {
+              ...profile,
+              defaultMeta: profile.defaultMeta || 0,
+              globalAssets: Array.isArray(profile.globalAssets) ? profile.globalAssets : []
+            }
+          }));
+        }
+      }
+    );
+
+    const unsubCategories = onSnapshot(query(collection(db, `users/${user.uid}/categories`)), 
+      (snap) => {
+        if (!snap.empty) setAppState(prev => ({ ...prev, categories: snap.docs.map(d => d.data() as Category) }));
+      }
+    );
+
+    const unsubPartners = onSnapshot(query(collection(db, `users/${user.uid}/partners`)), 
+      (snap) => {
+        setAppState(prev => ({ ...prev, partners: snap.docs.map(d => d.data() as Partner) }));
+      }
+    );
+
+    const usageRef = doc(db, `users/${user.uid}/usage`, todayStr);
+    const unsubUsage = onSnapshot(usageRef, (docSnap) => {
+      if (docSnap.exists()) {
+        setDailyUsage(docSnap.data().count || 0);
+      } else {
+        setDailyUsage(0);
+      }
+    });
+
+    return () => {
+      unsubData();
+      unsubProfile();
+      unsubCategories();
+      unsubPartners();
+      unsubUsage();
+    };
+  }, [user, todayStr]);
+
+  const currentMonthId = useMemo(() => {
+    const mIdx = MONTHS.indexOf(appState.currentMonth) + 1;
+    return `${appState.currentYear}-${mIdx.toString().padStart(2, '0')}`;
+  }, [appState.currentMonth, appState.currentYear]);
+
+  const currentMonthData = useMemo(() => {
+    const found = appState.data.find(d => {
+      const mIdx = MONTHS.indexOf(d.month) + 1;
+      const dId = `${d.year}-${mIdx.toString().padStart(2, '0')}`;
+      return dId === currentMonthId;
+    });
+
+    const baseData = found || {
+      month: appState.currentMonth,
+      year: appState.currentYear,
+      metaFaturamento: appState.userProfile.defaultMeta || 0, 
+      transactions: [],
+      balances: {},
+      cardDetails: {},
+      reserva: 0,
+      reservaCurrency: 'BRL',
+      investimento: 0,
+      retorno: 0
+    } as FinancialData;
+
+    const accounts = (appState.userProfile.globalAssets || [])
+      .filter(a => a.type === 'bank')
+      .map(asset => ({
+        ...asset,
+        balance: baseData.balances[asset.id] || 0
+      })) as AccountItem[];
+
+    const creditCards = (appState.userProfile.globalAssets || [])
+      .filter(a => a.type === 'card')
+      .map(asset => ({
+        ...asset,
+        balance: baseData.balances[asset.id] || 0,
+        dueDate: baseData.cardDetails?.[asset.id]?.dueDate || `${appState.currentYear}-${(MONTHS.indexOf(appState.currentMonth) + 1).toString().padStart(2, '0')}-10`,
+        situation: baseData.cardDetails?.[asset.id]?.situation || 'PENDENTE'
+      })) as CreditCardItem[];
+
+    return { ...baseData, accounts, creditCards };
+  }, [currentMonthId, appState.data, appState.userProfile, appState.currentMonth, appState.currentYear]);
+
+  const totals = useMemo(() => {
+    const txs = currentMonthData.transactions || [];
+    const pendingIncomes = txs.filter(t => t.type === 'Receita' && t.situation !== 'PAGO' && t.situation !== 'CANCELADO').reduce((acc, t) => acc + (Number(t.value) || 0), 0);
+    const totalIncomes = txs.filter(t => t.type === 'Receita' && t.situation !== 'CANCELADO').reduce((acc, t) => acc + (Number(t.value) || 0), 0);
+    const pendingTransactionsExpenses = txs.filter(t => t.type === 'Despesa' && t.situation !== 'PAGO' && t.situation !== 'CANCELADO').reduce((acc, t) => acc + (Number(t.value) || 0), 0);
+    const totalTransactionsExpenses = txs.filter(t => t.type === 'Despesa' && t.situation !== 'CANCELADO').reduce((acc, t) => acc + (Number(t.value) || 0), 0);
+    const pendingCardDebt = currentMonthData.creditCards.filter(c => c.situation !== 'PAGO').reduce((acc, c) => acc + (Number(c.balance) || 0), 0);
+    const totalCardDebtMonth = currentMonthData.creditCards.reduce((acc, c) => acc + (Number(c.balance) || 0), 0);
+    const totalPendingOutflows = pendingTransactionsExpenses + pendingCardDebt;
+    const availableCash = currentMonthData.accounts.reduce((acc, a) => acc + (Number(a.balance) || 0), 0);
+    const reservaValue = Number(currentMonthData.reserva) || 0;
+    const liquidHealthNoReserva = (availableCash + pendingIncomes) - totalPendingOutflows;
+    const liquidHealthWithReserva = liquidHealthNoReserva + reservaValue;
+
+    const cashFlowAlerts: { date: string, projectedBalance: number, items: string[] }[] = [];
+    let runningBalance = availableCash;
+    
+    const allEvents = [
+      ...txs.filter(t => t.situation !== 'PAGO' && t.situation !== 'CANCELADO'),
+      ...currentMonthData.creditCards.filter(c => c.situation !== 'PAGO').map(c => ({
+        id: c.id,
+        value: c.balance,
+        dueDate: c.dueDate || '',
+        type: 'Despesa' as const,
+        description: `Cartão: ${c.name}`
+      }))
+    ].sort((a,b) => (a.dueDate || '').localeCompare(b.dueDate || ''));
+
+    const dates = Array.from(new Set(allEvents.map(e => e.dueDate))).filter(d => !!d);
+
+    dates.forEach(dateStr => {
+      const dayEvents = allEvents.filter(e => e.dueDate === dateStr);
+      const dayIn = dayEvents.filter(e => e.type === 'Receita').reduce((acc, e) => acc + e.value, 0);
+      const dayOut = dayEvents.filter(e => e.type === 'Despesa').reduce((acc, e) => acc + e.value, 0);
+      runningBalance = runningBalance + dayIn - dayOut;
+      if (runningBalance < 0) {
+        cashFlowAlerts.push({ date: dateStr, projectedBalance: runningBalance, items: dayEvents.map(e => e.description) });
+      }
+    });
+    
+    return { 
+      totalIncomes, 
+      availableCash, 
+      pendingCardDebt, 
+      pendingIncomes, 
+      reservaValue,
+      totalPendingOutflows,
+      metaFaturamento: currentMonthData.metaFaturamento || appState.userProfile.defaultMeta || 0,
+      totalExpenses: totalTransactionsExpenses + totalCardDebtMonth,
+      liquidHealthWithReserva,
+      liquidHealthNoReserva,
+      pendingExpenses: totalPendingOutflows,
+      liquidHealth: liquidHealthNoReserva,
+      cashFlowAlerts
+    };
+  }, [currentMonthData, appState.userProfile.defaultMeta]);
+
+  const handleExecuteDuplication = async () => {
+    if (!user) return;
+    setIsConfirmDupOpen(false);
+    
+    let prevMIdx = MONTHS.indexOf(appState.currentMonth);
+    let prevYear = appState.currentYear;
+    if (prevMIdx === 0) { prevMIdx = 11; prevYear--; } else { prevMIdx--; }
+    
+    const prevMonthId = `${prevYear}-${(prevMIdx + 1).toString().padStart(2, '0')}`;
+    const prevDoc = await getDoc(doc(db, `users/${user.uid}/data`, prevMonthId));
+    
+    if (!prevDoc.exists()) {
+      alert("Operação Interrompida: Mês anterior sem registros.");
+      return;
+    }
+
+    const prevData = prevDoc.data() as FinancialData;
+    const currentMIdx = MONTHS.indexOf(appState.currentMonth) + 1;
+    const currentMonthPrefix = appState.currentMonth.slice(0, 3);
+    const newMonthRef = `${currentMonthPrefix}/${appState.currentYear}`;
+
+    const duplicatedTransactions = (prevData.transactions || []).map(t => {
+      let newDate = t.dueDate;
+      try {
+        const parts = t.dueDate.split('-');
+        if (parts.length === 3) {
+          newDate = `${appState.currentYear}-${currentMIdx.toString().padStart(2, '0')}-${parts[2]}`;
+        }
+      } catch (e) {}
+
+      return {
+        ...t,
+        id: Math.random().toString(36).substr(2, 9),
+        situation: 'PENDENTE' as Situation,
+        dueDate: newDate,
+        monthRef: newMonthRef
+      };
+    });
+
+    const newCardDetails: Record<string, { dueDate: string; situation: Situation }> = {};
+    if (prevData.cardDetails) {
+      Object.keys(prevData.cardDetails).forEach(cardId => {
+        const detail = prevData.cardDetails![cardId];
+        let newCardDate = detail.dueDate || '';
+        try {
+          const parts = newCardDate.split('-');
+          if (parts.length === 3) {
+            newCardDate = `${appState.currentYear}-${currentMIdx.toString().padStart(2, '0')}-${parts[2]}`;
+          }
+        } catch (e) {}
+        newCardDetails[cardId] = { dueDate: newCardDate, situation: 'PENDENTE' };
+      });
+    }
+
+    await setDoc(doc(db, `users/${user.uid}/data`, currentMonthId), {
+      ...currentMonthData,
+      transactions: [...(currentMonthData.transactions || []), ...duplicatedTransactions],
+      balances: prevData.balances || {},
+      cardDetails: newCardDetails,
+      reserva: prevData.reserva || 0,
+      metaFaturamento: prevData.metaFaturamento || appState.userProfile.defaultMeta || 0
+    }, { merge: true });
+
+    alert("Estratégia duplicada com sucesso!");
+  };
+
+  const updateBalanceInMonth = async (assetId: string, newBalance: number) => {
+    if (!user) return;
+    const currentBalances = { ...(currentMonthData.balances || {}) };
+    currentBalances[assetId] = newBalance;
+    await setDoc(doc(db, `users/${user.uid}/data`, currentMonthId), { ...currentMonthData, balances: currentBalances }, { merge: true });
+  };
+
+  const updateCardDetail = async (assetId: string, field: 'dueDate' | 'situation', value: any) => {
+    if (!user) return;
+    const currentDetails = { ...(currentMonthData.cardDetails || {}) };
+    currentDetails[assetId] = { ...(currentDetails[assetId] || {}), [field]: value };
+    await setDoc(doc(db, `users/${user.uid}/data`, currentMonthId), { ...currentMonthData, cardDetails: currentDetails }, { merge: true });
+  };
+
+  const updateReservaInMonth = async (newReserva: number) => {
+    if (!user) return;
+    await setDoc(doc(db, `users/${user.uid}/data`, currentMonthId), { ...currentMonthData, reserva: newReserva }, { merge: true });
+  };
+
+  const handleReorderTransactions = async (newTransactions: BaseTransaction[]) => {
+    if (!user) return;
+    await setDoc(doc(db, `users/${user.uid}/data`, currentMonthId), { ...currentMonthData, transactions: newTransactions }, { merge: true });
+  };
+
+  const updateUserProfile = async (profile: UserProfile) => {
+    if (!user) return;
+    await setDoc(doc(db, `users/${user.uid}/profile`, 'settings'), profile, { merge: true });
+  };
+
+  const isInfinite = user?.email === 'thor4tech@gmail.com';
+  const remainingCredits = isInfinite ? Infinity : Math.max(0, 3 - dailyUsage);
+
+  return (
+    <div className="min-h-screen bg-[#f8fafc] flex flex-col font-inter overflow-x-hidden pb-10 relative w-full">
+      <header className="bg-white/95 border-b border-slate-200 sticky top-0 z-[100] backdrop-blur-2xl shadow-sm w-full">
+        <div className="max-w-screen-2xl mx-auto px-4 lg:px-10 h-16 md:h-24 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 md:gap-4 cursor-pointer group shrink-0" onClick={() => setAppState(prev => ({...prev, view: 'dashboard'}))}>
+            <div className="bg-[#020617] p-2 md:p-3.5 rounded-xl md:rounded-2xl text-white shadow-xl group-hover:bg-indigo-600 transition-all flex items-center justify-center">
+              <Activity size={18} />
+            </div>
+            <div className="hidden sm:block">
+              <h1 className="text-base md:text-xl font-black text-slate-900 tracking-tighter leading-none uppercase">Cria Gestão <span className="text-indigo-600">Pro</span></h1>
+              <p className="text-[8px] md:text-[9px] font-black text-slate-400 uppercase tracking-[0.4em] mt-1">{appState.userProfile.company}</p>
+            </div>
+          </div>
+
+          <div className="flex items-center bg-slate-100/60 rounded-full p-1 border border-slate-200 shadow-inner min-w-0 max-w-[150px] sm:max-w-none">
+            <button onClick={() => { let mIdx = MONTHS.indexOf(appState.currentMonth); let y = appState.currentYear; if (mIdx === 0) { mIdx = 11; y--; } else { mIdx--; } setAppState(prev => ({...prev, currentMonth: MONTHS[mIdx], currentYear: y})); }} className="p-1.5 md:p-3 hover:bg-white rounded-full text-slate-500 transition-all"><ChevronLeft size={14} /></button>
+            <div className="px-1 sm:px-10 text-center min-w-[50px] sm:min-w-[150px] truncate">
+              <span className="text-[8px] sm:text-[11px] font-black text-slate-900 uppercase tracking-widest block leading-none truncate">{appState.currentMonth}</span>
+              <span className="text-[6px] sm:text-[9px] font-black text-indigo-500 uppercase block mt-0.5">{appState.currentYear}</span>
+            </div>
+            <button onClick={() => { let mIdx = MONTHS.indexOf(appState.currentMonth); let y = appState.currentYear; if (mIdx === 11) { mIdx = 0; y++; } else { mIdx++; } setAppState(prev => ({...prev, currentMonth: MONTHS[mIdx], currentYear: y})); }} className="p-1.5 md:p-3 hover:bg-white rounded-full text-slate-500 transition-all"><ChevronRight size={14} /></button>
+          </div>
+
+          <div className="flex items-center gap-2 md:gap-4 shrink-0">
+            <div className="hidden lg:flex items-center gap-4 bg-slate-900 px-6 py-3 rounded-2xl border border-white/5 shadow-2xl">
+               <div className="flex flex-col items-end">
+                  <span className="text-[7px] font-black text-white/40 uppercase tracking-widest">IA Credits</span>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    {isInfinite ? (
+                      <span className="flex items-center gap-1 text-[9px] font-black text-indigo-400 uppercase"><Unlock size={10}/> Master Access</span>
+                    ) : (
+                      <div className="flex gap-1">
+                        {[1, 2, 3].map(i => (
+                          <div key={i} className={`w-2 h-2 rounded-full ${i <= remainingCredits ? 'bg-emerald-500 shadow-[0_0_5px_rgba(16,185,129,0.8)]' : 'bg-white/10'}`}></div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+               </div>
+               <div className="p-2 bg-white/10 rounded-lg text-indigo-400"><Zap size={14} fill="currentColor" /></div>
+            </div>
+
+            <div className="relative">
+              <button 
+                onClick={() => setIsAlertsOpen(!isAlertsOpen)} 
+                className={`p-2 md:p-3.5 rounded-xl md:rounded-2xl transition-all shadow-sm border ${totals.cashFlowAlerts.length > 0 ? 'bg-rose-50 border-rose-200 text-rose-500 animate-pulse' : 'bg-slate-50 border-slate-200 text-slate-400 hover:text-indigo-600'}`}
+              >
+                <Bell size={18} />
+              </button>
+              {totals.cashFlowAlerts.length > 0 && (
+                <span className="absolute -top-1 -right-1 w-3 h-3 bg-rose-600 rounded-full border-2 border-white"></span>
+              )}
+            </div>
+            <button onClick={() => setIsSettingsOpen(true)} className="p-2 md:p-3.5 bg-slate-50 border border-slate-200 text-slate-400 rounded-xl md:rounded-2xl hover:bg-indigo-600 hover:text-white transition-all shadow-sm"><Settings size={18} /></button>
+            <button onClick={() => signOut(auth)} className="hidden sm:block p-2 md:p-3.5 bg-rose-50 text-rose-500 rounded-xl md:rounded-2xl hover:bg-rose-500 hover:text-white transition-all"><LogOut size={18} /></button>
+          </div>
+        </div>
+      </header>
+
+      {isAlertsOpen && (
+        <div className="fixed inset-0 z-[200] flex justify-end">
+          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setIsAlertsOpen(false)}></div>
+          <div className="relative w-full max-w-[280px] sm:max-w-sm bg-white h-full shadow-4xl animate-in slide-in-from-right duration-300 flex flex-col">
+            <div className="p-6 md:p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+               <div className="flex items-center gap-3">
+                  <AlertTriangle size={20} className="text-rose-600" />
+                  <h3 className="text-sm sm:text-lg font-black text-slate-900 uppercase tracking-tight">Auditoria</h3>
+               </div>
+               <button onClick={() => setIsAlertsOpen(false)} className="p-2 hover:bg-slate-200 rounded-full"><X size={20}/></button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 sm:p-8 space-y-6">
+              {totals.cashFlowAlerts.length > 0 ? (
+                <>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">Risco de ruptura detectado:</p>
+                  {totals.cashFlowAlerts.map((alert, idx) => (
+                    <div key={idx} className="p-4 sm:p-6 bg-rose-50 border-2 border-rose-100 rounded-[20px] sm:rounded-[24px] space-y-3">
+                       <div className="flex justify-between items-center">
+                          <span className="text-[10px] font-black text-rose-600 uppercase tracking-widest">{format(parseISO(alert.date), "dd 'de' MMMM", { locale: ptBR })}</span>
+                       </div>
+                       <div className="text-lg sm:text-xl font-black text-slate-900 font-mono tracking-tighter">
+                          Saldo: {(alert.projectedBalance || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                       </div>
+                    </div>
+                  ))}
+                </>
+              ) : (
+                <div className="h-full flex flex-col items-center justify-center opacity-30 text-center gap-4">
+                   <div className="p-8 bg-emerald-50 text-emerald-600 rounded-full"><CheckCircle2 size={48} /></div>
+                   <p className="text-[11px] font-black uppercase tracking-[0.3em]">Caixa Seguro.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <main className="max-w-screen-2xl mx-auto px-4 lg:px-10 py-6 md:py-10 w-full space-y-8 md:space-y-12">
+        <div className="flex flex-col gap-4">
+          <div className="flex gap-1 p-1 bg-white border border-slate-200 rounded-full shadow-lg overflow-x-auto no-scrollbar w-full">
+            {[
+              { id: 'dashboard', label: 'Estratégia', icon: LayoutDashboard }, 
+              { id: 'analytics', label: 'Análise', icon: BarChart3 }, 
+              { id: 'transactions', label: 'Fluxo', icon: List }, 
+              { id: 'partners', label: 'Parceiros', icon: Users }, 
+              { id: 'calendar', label: 'Agenda', icon: Calendar }
+            ].map(tab => (
+              <button key={tab.id} onClick={() => setAppState(prev => ({ ...prev, view: tab.id as any }))} className={`flex items-center gap-1.5 px-4 sm:px-8 py-2.5 rounded-full text-[8px] sm:text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${appState.view === tab.id ? 'bg-[#020617] text-white shadow-md' : 'text-slate-400 hover:bg-slate-50'}`}>
+                <tab.icon size={12} className="sm:size-[14px]" /> {tab.label}
+              </button>
+            ))}
+          </div>
+          
+          <div className="flex justify-between items-center gap-2">
+            <button onClick={() => setIsCatModalOpen(true)} className="flex-1 sm:flex-none px-4 sm:px-6 py-3 bg-white border border-slate-200 rounded-full sm:rounded-[24px] text-[8px] sm:text-[10px] font-black text-slate-600 uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-slate-50 shadow-sm transition-all"><Palette size={14} /> Categorias</button>
+            <button onClick={() => setIsConfirmDupOpen(true)} className="px-4 sm:px-6 py-3 bg-indigo-50 text-indigo-600 rounded-full sm:rounded-[24px] hover:bg-indigo-600 hover:text-white transition-all shadow-sm flex items-center gap-2 text-[8px] sm:text-[10px] font-black uppercase tracking-widest">
+              <Copy size={14} /> <span className="inline">Duplicar Anterior</span>
+            </button>
+          </div>
+        </div>
+
+        {appState.view === 'dashboard' && (
+          <div className="space-y-6 md:space-y-12 animate-in fade-in slide-in-from-bottom-5 duration-700 w-full">
+            <div className="bg-[#0f172a] p-4 sm:p-12 rounded-[32px] sm:rounded-[56px] shadow-4xl relative overflow-hidden group border border-white/5">
+               <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 via-transparent to-emerald-500/5 pointer-events-none"></div>
+               <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-8 relative z-10">
+                  <KPIItem label="Bancos (Atual)" value={totals.availableCash || 0} color="text-white" icon={Wallet} sub="Disponibilidade real" />
+                  <KPIItem label="A Receber" value={totals.pendingIncomes || 0} color="text-emerald-400" icon={ArrowUpRight} sub="Entradas pendentes" />
+                  <KPIItem label="A Pagar" value={totals.totalPendingOutflows || 0} color="text-rose-400" icon={ArrowDownCircle} sub="Saídas pendentes" />
+                  <KPIItem label="Reserva" isEditable value={totals.reservaValue || 0} color="text-indigo-400" icon={PiggyBank} sub="Bloco de investimento" onUpdateValue={updateReservaInMonth} />
+                  
+                  <div className={`col-span-2 lg:col-span-1 p-5 sm:p-10 rounded-[28px] sm:rounded-[48px] border-2 flex flex-col justify-between transition-all hover:scale-[1.05] ${totals.liquidHealthNoReserva >= 0 ? 'bg-emerald-500/10 border-emerald-500/20 shadow-md' : 'bg-rose-500/10 border-rose-500/20 shadow-md'}`}>
+                     <div>
+                        <span className="text-[8px] sm:text-[10px] font-black text-white/40 uppercase tracking-[0.3em] block mb-2 sm:mb-3">Saúde Líquida</span>
+                        <div className={`text-sm sm:text-2xl font-black font-mono tracking-tighter ${totals.liquidHealthNoReserva >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                           {(totals.liquidHealthNoReserva || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                        </div>
+                     </div>
+                     <div className="mt-4 pt-4 border-t border-white/5">
+                        <span className="text-[8px] sm:text-[10px] font-black text-white/40 uppercase tracking-widest block">Projeção C/ Res.</span>
+                        <span className={`text-[10px] sm:text-[11px] font-black font-mono ${totals.liquidHealthWithReserva >= 0 ? 'text-indigo-400' : 'text-rose-400'}`}>
+                           {(totals.liquidHealthWithReserva || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                        </span>
+                     </div>
+                  </div>
+               </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-12 w-full">
+               <div className="lg:col-span-2 space-y-6 sm:space-y-12">
+                  <div className="bg-white p-5 sm:p-14 rounded-[32px] sm:rounded-[56px] border border-slate-200 shadow-xl space-y-6 sm:space-y-10">
+                    <div className="flex justify-between items-center border-b border-slate-100 pb-4 sm:pb-8"><h4 className="text-[9px] sm:text-[11px] font-black text-slate-900 uppercase tracking-[0.4em] flex items-center gap-3"><Landmark size={18} className="text-indigo-500" /> Bancos & Carteiras</h4></div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-8">
+                      {currentMonthData.accounts.map(acc => ( <BalanceItem key={acc.id} item={acc} onUpdateBalance={v => updateBalanceInMonth(acc.id, v)} /> ))}
+                      {currentMonthData.accounts.length === 0 && <EmptyAsset message="Config. Bancos" icon={Landmark} onClick={() => setIsSettingsOpen(true)} />}
+                    </div>
+                  </div>
+               </div>
+               <div className="bg-white p-5 sm:p-12 rounded-[32px] sm:rounded-[56px] border border-slate-200 shadow-xl space-y-6 sm:space-y-10">
+                  <div className="flex justify-between items-center border-b border-slate-100 pb-4 sm:pb-8"><h4 className="text-[9px] sm:text-[11px] font-black text-slate-900 uppercase tracking-[0.4em] flex items-center gap-3"><CreditCard size={18} className="text-rose-500" /> Dívida Cartão</h4></div>
+                  <div className="space-y-4 sm:space-y-6">
+                    {currentMonthData.creditCards.map(card => ( 
+                      <SimpleCardItem 
+                        key={card.id} 
+                        item={card} 
+                        onUpdateBalance={v => updateBalanceInMonth(card.id, v)} 
+                        onUpdateDate={d => updateCardDetail(card.id, 'dueDate', d)}
+                        onUpdateStatus={s => updateCardDetail(card.id, 'situation', s)}
+                      /> 
+                    ))}
+                    {currentMonthData.creditCards.length === 0 && <EmptyAsset message="Config. Cartões" icon={CreditCard} onClick={() => setIsSettingsOpen(true)} />}
+                  </div>
+               </div>
+            </div>
+          </div>
+        )}
+
+        {appState.view === 'transactions' && <SplitTransactionView transactions={currentMonthData.transactions || []} categories={appState.categories} partners={appState.partners} onToggleStatus={id => { const txs = currentMonthData.transactions.map(t => t.id === id ? { ...t, situation: (['PENDENTE','AGENDADO','PAGO','CANCELADO'] as Situation[])[(['PENDENTE','AGENDADO','PAGO','CANCELADO'].indexOf(t.situation) + 1) % 4] } : t); handleReorderTransactions(txs); }} onDelete={id => handleReorderTransactions(currentMonthData.transactions.filter(t => t.id !== id))} onEdit={tx => { setEditingTransaction(tx); setIsModalOpen(true); }} onAddNew={type => { setModalPreType(type); setEditingTransaction(undefined); setIsModalOpen(true); }} onQuickUpdate={(id, f, v) => handleReorderTransactions(currentMonthData.transactions.map(t => t.id === id ? { ...t, [f]: v } : t))} totals={totals} onReorder={handleReorderTransactions} />}
+        {appState.view === 'partners' && <PartnerManager partners={appState.partners} onAdd={p => setDoc(doc(db, `users/${user.uid}/partners`, p.id), p)} onDelete={id => deleteDoc(doc(db, `users/${user.uid}/partners`, id))} onUpdate={p => updateDoc(doc(db, `users/${user.uid}/partners`, p.id), { ...p })} />}
+        {appState.view === 'calendar' && <CalendarView month={appState.currentMonth} year={appState.currentYear} transactions={currentMonthData.transactions || []} />}
+        {appState.view === 'analytics' && <AnalyticsView monthData={currentMonthData} totals={totals} />}
+      </main>
+
+      <ConfirmModal isOpen={isConfirmDupOpen} title="Duplicar Estratégia?" message="Deseja copiar todos os registros do mês anterior?" onConfirm={handleExecuteDuplication} onCancel={() => setIsConfirmDupOpen(false)} />
+      <TransactionModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSave={tx => { const txs = [...currentMonthData.transactions]; const idx = txs.findIndex(t => t.id === tx.id); if (idx >= 0) txs[idx] = tx; else txs.push(tx); handleReorderTransactions(txs); }} categories={appState.categories} initialData={editingTransaction} defaultType={modalPreType} defaultMonthRef={`${appState.currentMonth.slice(0,3)}/${appState.currentYear}`} />
+      <CategoryModal isOpen={isCatModalOpen} onClose={() => setIsCatModalOpen(false)} categories={appState.categories} onSaveCategories={cats => cats.forEach(c => setDoc(doc(db, `users/${user.uid}/categories`, c.id), c))} />
+      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} userProfile={appState.userProfile} userEmail={user.email || ''} onSaveProfile={updateUserProfile} />
+      <OnboardingGuide isOpen={showOnboarding} onClose={() => setShowOnboarding(false)} userName={appState.userProfile.name} />
+    </div>
+  );
+};
+
+const KPIItem: React.FC<{ label: string; value: number; color: string; icon: any; sub: string; isEditable?: boolean; onUpdateValue?: (v: number) => void }> = ({ label, value, color, icon: Icon, sub, isEditable, onUpdateValue }) => {
+  const [localEdit, setLocalEdit] = useState((value || 0).toString());
+  const [isEditing, setIsEditing] = useState(false);
+  useEffect(() => { setLocalEdit((value || 0).toString()); }, [value]);
+  return (
+    <div className={`bg-white/5 p-4 sm:p-8 rounded-[24px] sm:rounded-[40px] flex flex-col justify-between min-h-[120px] sm:min-h-[200px] hover:bg-white/10 transition-all border border-white/5 shadow-inner`}>
+      <div className="flex items-center justify-between mb-2 sm:mb-5"><span className="text-[7px] sm:text-[9px] font-black text-slate-500 uppercase tracking-widest">{label}</span><div className={`p-1.5 sm:p-3 bg-white/5 rounded-xl text-indigo-400`}><Icon size={14} className="sm:size-[16px]" /></div></div>
+      <div>
+        {isEditable ? (
+          <div className="flex items-center gap-1.5"><span className={`text-[8px] sm:text-[12px] font-black font-mono ${color}`}>R$</span><input type="number" step="0.01" value={localEdit} onChange={e => setLocalEdit(e.target.value)} onBlur={() => { onUpdateValue?.(parseFloat(localEdit) || 0); setIsEditing(false); }} onFocus={() => setIsEditing(true)} className={`bg-transparent w-full text-xs sm:text-2xl font-black font-mono outline-none border-b tracking-tighter transition-all ${isEditing ? 'border-indigo-500 text-white' : 'border-transparent ' + color}`}/></div>
+        ) : (<div className={`text-xs sm:text-2xl font-black font-mono tracking-tighter leading-none ${color}`}>{(value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>)}
+        <p className="hidden sm:block text-[7px] sm:text-[9px] font-black text-white/20 uppercase tracking-[0.2em] mt-2 sm:mt-4">{sub}</p>
+      </div>
+    </div>
+  );
+};
+
+const BalanceItem: React.FC<{ item: AccountItem; onUpdateBalance: (v: number) => void }> = ({ item, onUpdateBalance }) => {
+  const [localVal, setLocalVal] = useState((item?.balance || 0).toString());
+  useEffect(() => { setLocalVal((item?.balance || 0).toString()); }, [item?.balance]);
+  return (
+    <div className="bg-slate-50 p-4 sm:p-7 rounded-[28px] sm:rounded-[40px] border border-slate-100 hover:bg-white hover:shadow-2xl transition-all relative group overflow-hidden">
+      <div className="flex items-center gap-3 sm:gap-4 mb-4 sm:mb-8 relative z-10"><div className="w-8 h-8 sm:w-12 sm:h-12 bg-white border border-slate-200 rounded-xl sm:rounded-2xl text-lg sm:text-2xl flex items-center justify-center shadow-sm">{item?.icon || '🏦'}</div><div className="flex-1 min-w-0"><span className="text-[9px] sm:text-[11px] font-black text-slate-500 uppercase tracking-widest truncate block leading-none">{item?.name}</span></div></div>
+      <div className="bg-white px-4 sm:px-6 py-2.5 sm:py-5 rounded-[18px] sm:rounded-[32px] border border-slate-100 flex items-center gap-2 sm:gap-3 shadow-inner relative z-10"><span className="text-[8px] sm:text-[12px] font-black text-slate-300 font-mono">R$</span><input type="number" step="0.01" value={localVal} onChange={e => setLocalVal(e.target.value)} onBlur={() => onUpdateBalance(parseFloat(localVal) || 0)} className="bg-transparent w-full text-sm sm:text-xl font-black text-slate-800 font-mono outline-none" /></div>
+    </div>
+  );
+};
+
+const SimpleCardItem: React.FC<{ item: CreditCardItem; onUpdateBalance: (v: number) => void; onUpdateDate: (d: string) => void; onUpdateStatus: (s: Situation) => void }> = ({ item, onUpdateBalance, onUpdateDate, onUpdateStatus }) => {
+  const [localVal, setLocalVal] = useState((item?.balance || 0).toString());
+  useEffect(() => { setLocalVal((item?.balance || 0).toString()); }, [item?.balance]);
+  return (
+    <div className="bg-slate-50 p-4 sm:p-6 rounded-[24px] sm:rounded-[32px] border border-transparent hover:border-rose-100 hover:bg-white transition-all shadow-sm space-y-3 sm:space-y-4 group">
+      <div className="flex justify-between items-center">
+        <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
+          <div className="p-2 sm:p-3 bg-white rounded-xl text-slate-300 group-hover:text-rose-500 shadow-sm"><CardIcon size={16} /></div>
+          <div className="truncate"><span className="text-[9px] sm:text-[11px] font-black text-slate-600 uppercase tracking-widest block leading-none">{item?.name}</span></div>
+        </div>
+        <button onClick={() => onUpdateStatus(item.situation === 'PAGO' ? 'PENDENTE' : 'PAGO')} className={`px-2 sm:px-4 py-1 rounded-xl text-[7px] sm:text-[8px] font-black uppercase border transition-all ${item.situation === 'PAGO' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-rose-100 text-rose-700 border-rose-200'}`}>{item.situation}</button>
+      </div>
+      <div className="grid grid-cols-2 gap-2 sm:gap-4">
+        <div className="bg-white px-2 sm:px-3 py-2 sm:py-3 rounded-xl sm:rounded-2xl shadow-inner border border-slate-100 flex items-center gap-1 sm:gap-2">
+          <Clock size={10} className="text-slate-300" />
+          <input type="date" value={item.dueDate || ''} onChange={e => onUpdateDate(e.target.value)} className="bg-transparent text-[8px] sm:text-[10px] font-black font-mono outline-none w-full text-slate-600" />
+        </div>
+        <div className="bg-white px-2 sm:px-3 py-2 sm:py-3 rounded-xl sm:rounded-2xl shadow-inner border border-slate-100 flex items-center gap-1 sm:gap-2">
+          <span className="text-[8px] sm:text-[10px] font-black text-slate-300 font-mono">R$</span>
+          <input type="number" step="0.01" value={localVal} onChange={e => setLocalVal(e.target.value)} onBlur={() => onUpdateBalance(parseFloat(localVal) || 0)} className="bg-transparent text-[9px] sm:text-[11px] font-black font-mono outline-none w-full text-slate-800 tracking-tighter" />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const EmptyAsset: React.FC<{ message: string; icon: any; onClick?: () => void }> = ({ message, icon: Icon, onClick }) => (
+  <button 
+    onClick={onClick}
+    className="w-full py-6 sm:py-10 border-2 border-dashed border-slate-200 rounded-[24px] sm:rounded-[32px] flex flex-col items-center justify-center opacity-40 hover:opacity-100 hover:bg-white hover:border-indigo-400 hover:shadow-lg transition-all group"
+  >
+    <Icon size={24} className="text-slate-300 mb-2 sm:mb-3 group-hover:text-indigo-500 transition-colors" />
+    <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-widest text-slate-500 group-hover:text-indigo-600">{message}</span>
+  </button>
+);
+
+export default Dashboard;
