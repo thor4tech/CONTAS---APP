@@ -22,25 +22,34 @@ const SplitTransactionView: React.FC<Props> = ({ transactions, categories, partn
   const incomes = transactions.filter(t => t.type === 'Receita');
   const expenses = transactions.filter(t => t.type === 'Despesa');
 
+  const handleReorder = (type: 'Receita' | 'Despesa', reorderedPart: BaseTransaction[]) => {
+    if (!onReorder) return;
+    if (type === 'Receita') {
+      onReorder([...reorderedPart, ...expenses]);
+    } else {
+      onReorder([...incomes, ...reorderedPart]);
+    }
+  };
+
   return (
     <div className="space-y-6 md:space-y-10 animate-in fade-in duration-500">
-      <div className="flex justify-center sticky top-24 md:top-28 z-[90]">
-        <div className="flex p-1 bg-white border border-slate-200 rounded-full shadow-2xl backdrop-blur-xl w-full max-w-sm">
+      <div className="flex justify-center sticky top-[150px] md:top-[160px] z-[85]">
+        <div className="flex p-1 bg-white border border-slate-100 rounded-full shadow-2xl backdrop-blur-xl w-full max-w-[320px] md:max-w-sm">
            <button 
              onClick={() => setActiveView('income')} 
-             className={`flex-1 px-4 py-3 text-[10px] font-black uppercase tracking-widest rounded-full transition-all ${activeView === 'income' ? 'bg-emerald-600 text-white' : 'text-slate-400'}`}
+             className={`flex-1 px-4 py-2.5 md:py-3 text-[9px] md:text-[10px] font-black uppercase tracking-widest rounded-full transition-all ${activeView === 'income' ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-50'}`}
            >
              Entradas
            </button>
            <button 
              onClick={() => setActiveView('both')} 
-             className={`hidden sm:flex flex-1 items-center justify-center px-4 py-3 text-[10px] font-black uppercase tracking-widest rounded-full transition-all ${activeView === 'both' ? 'bg-indigo-600 text-white' : 'text-slate-400'}`}
+             className={`hidden sm:flex flex-1 items-center justify-center px-4 py-3 text-[10px] font-black uppercase tracking-widest rounded-full transition-all ${activeView === 'both' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-50'}`}
            >
              Ambos
            </button>
            <button 
              onClick={() => setActiveView('expense')} 
-             className={`flex-1 px-4 py-3 text-[10px] font-black uppercase tracking-widest rounded-full transition-all ${activeView === 'expense' ? 'bg-slate-900 text-white' : 'text-slate-400'}`}
+             className={`flex-1 px-4 py-2.5 md:py-3 text-[9px] md:text-[10px] font-black uppercase tracking-widest rounded-full transition-all ${activeView === 'expense' ? 'bg-[#020617] text-white shadow-lg' : 'text-slate-400 hover:bg-slate-50'}`}
            >
              Saídas
            </button>
@@ -61,13 +70,13 @@ const SplitTransactionView: React.FC<Props> = ({ transactions, categories, partn
             onAddNew={() => onAddNew('Receita')}
             onQuickUpdate={onQuickUpdate}
             totals={totals}
-            onReorder={(data) => onReorder?.([...expenses, ...data])}
+            onReorder={(data) => handleReorder('Receita', data)}
           />
         </div>
         <div className={`space-y-6 ${activeView === 'income' ? 'hidden' : 'block'}`}>
           <TransactionTable 
             title="FLUXO DE SAÍDAS" 
-            color="bg-slate-900"
+            color="bg-[#020617]"
             data={expenses}
             categories={categories}
             partners={partners}
@@ -77,7 +86,7 @@ const SplitTransactionView: React.FC<Props> = ({ transactions, categories, partn
             onAddNew={() => onAddNew('Despesa')}
             onQuickUpdate={onQuickUpdate}
             totals={totals}
-            onReorder={(data) => onReorder?.([...incomes, ...data])}
+            onReorder={(data) => handleReorder('Despesa', data)}
           />
         </div>
       </div>

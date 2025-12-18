@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { auth, db } from '../lib/firebase';
 import { signOut, type User } from 'firebase/auth';
-import { collection, onSnapshot, doc, setDoc, query, deleteDoc, updateDoc, getDoc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, setDoc, query, deleteDoc, updateDoc, getDoc, orderBy } from 'firebase/firestore';
 import { MONTHS, DEFAULT_CATEGORIES } from '../constants';
 import { AppState, FinancialData, BaseTransaction, Situation, Category, Partner, UserProfile, AccountItem, CreditCardItem, PlanId, SubscriptionStatus } from '../types';
 import SplitTransactionView from './SplitTransactionView';
@@ -19,7 +19,7 @@ import {
   CreditCard, Landmark, ArrowDownCircle, Zap, 
   Settings, ShieldCheck, CreditCard as CardIcon, 
   BarChart3, PiggyBank, Copy, ArrowUpRight, X, 
-  Sparkles, FilterX, LayoutTemplate, CheckCircle2, Clock
+  Sparkles, FilterX, LayoutTemplate, CheckCircle2, Clock, AlertTriangle, Bell, Shield
 } from 'lucide-react';
 
 interface DashboardProps {
@@ -41,41 +41,41 @@ const BalanceItem = ({ item, onUpdateBalance, onFilter, isActive, onUpdateStatus
   };
 
   return (
-    <div className={`bg-white p-4 md:p-5 rounded-3xl border transition-all flex flex-col gap-3 shadow-sm ${isActive ? 'ring-2 ring-blue-500 border-blue-500 bg-blue-50/30' : 'border-slate-100 hover:shadow-md'}`}>
+    <div className={`bg-white p-5 md:p-6 rounded-[32px] border transition-all flex flex-col gap-4 shadow-sm ${isActive ? 'ring-2 ring-blue-500 border-blue-500 bg-blue-50/30' : 'border-slate-100 hover:shadow-md'}`}>
       <div className="flex items-center justify-between group">
-        <div className="flex items-center gap-3 overflow-hidden">
-          <div onClick={onFilter} className={`p-2.5 rounded-xl shadow-sm cursor-pointer transition-colors ${isActive ? 'bg-blue-600 text-white' : 'bg-slate-50 text-slate-400 group-hover:text-blue-600'}`}>
+        <div className="flex items-center gap-4 overflow-hidden">
+          <div onClick={onFilter} className={`p-3 rounded-2xl shadow-sm cursor-pointer transition-colors ${isActive ? 'bg-blue-600 text-white' : 'bg-slate-50 text-slate-400 group-hover:text-blue-600'}`}>
             {item.icon || (item.type === 'bank' ? '🏦' : '💳')}
           </div>
           <div className="min-w-0">
-            <h5 className="text-[10px] font-black text-slate-800 uppercase tracking-tight truncate">{item.name}</h5>
-            <p className="text-[8px] font-bold text-slate-400 uppercase">Saldo Atual</p>
+            <h5 className="text-[11px] font-black text-slate-900 uppercase tracking-tight truncate">{item.name}</h5>
+            <p className="text-[9px] font-bold text-slate-400 uppercase">Disponível</p>
           </div>
         </div>
         {isEditing ? (
           <input autoFocus type="number" className="w-24 bg-white border-2 border-blue-200 rounded-xl px-2 py-1 font-mono font-black text-xs outline-none" value={val} onChange={e => setVal(e.target.value)} onBlur={finishEdit} onKeyDown={e => e.key === 'Enter' && finishEdit()} />
         ) : (
-          <div onClick={() => setIsEditing(true)} className="text-xs font-black text-slate-900 font-mono tracking-tighter cursor-pointer px-2 py-1 hover:bg-blue-50 rounded-lg transition-all">
+          <div onClick={() => setIsEditing(true)} className="text-sm font-black text-slate-900 font-mono tracking-tighter cursor-pointer px-3 py-1.5 hover:bg-blue-50 rounded-xl transition-all">
             {(item.balance || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
           </div>
         )}
       </div>
       
       {item.type === 'card' && (
-        <div className="flex items-center justify-between pt-2 border-t border-slate-50">
-          <div className="flex items-center gap-2">
-            <Clock size={10} className="text-slate-300" />
+        <div className="flex items-center justify-between pt-3 border-t border-slate-50">
+          <div className="flex items-center gap-3">
+            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Dia:</span>
             <input 
               type="text" 
-              placeholder="Dia"
+              placeholder="00"
               value={item.dueDate || ''} 
               onChange={e => onUpdateDate(e.target.value)}
-              className="w-8 text-[10px] font-black text-slate-500 bg-transparent outline-none border-b border-transparent focus:border-blue-300"
+              className="w-10 text-[13px] font-black text-blue-600 bg-slate-50 rounded-lg px-2 py-1 outline-none border border-transparent focus:border-blue-200 text-center"
             />
           </div>
           <button 
             onClick={onUpdateStatus}
-            className={`px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest border transition-all ${item.situation === 'PAGO' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-amber-50 text-amber-600 border-amber-100'}`}
+            className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border transition-all ${item.situation === 'PAGO' ? 'bg-emerald-50 text-emerald-600 border-emerald-200 shadow-sm shadow-emerald-100' : 'bg-amber-50 text-amber-600 border-amber-200 shadow-sm shadow-amber-100'}`}
           >
             {item.situation || 'PENDENTE'}
           </button>
@@ -85,7 +85,7 @@ const BalanceItem = ({ item, onUpdateBalance, onFilter, isActive, onUpdateStatus
   );
 };
 
-const KPIItem = ({ label, value, sub, icon: Icon, color, isEditable, onUpdateValue }: any) => {
+const KPIItem = ({ label, value, sub, icon: Icon, color, isEditable, onUpdateValue, special }: any) => {
   const [isEditing, setIsEditing] = useState(false);
   const [localVal, setLocalVal] = useState(value.toString());
 
@@ -96,23 +96,23 @@ const KPIItem = ({ label, value, sub, icon: Icon, color, isEditable, onUpdateVal
   };
 
   return (
-    <div className="flex flex-col justify-between p-5 md:p-6 rounded-3xl bg-slate-800/40 border border-white/5 hover:bg-slate-800/60 transition-all group h-full">
+    <div className={`flex flex-col justify-between p-5 md:p-6 rounded-[32px] border transition-all group h-full shadow-2xl ${special ? 'bg-indigo-600/10 border-indigo-500/20' : 'bg-slate-800/40 border-white/5 hover:bg-slate-800/60'}`}>
       <div className="flex justify-between items-start mb-4">
         <div className="flex flex-col">
-          <span className="text-[8px] font-black text-white/30 uppercase tracking-[0.3em] block mb-2">{label}</span>
+          <span className={`text-[8px] md:text-[9px] font-black uppercase tracking-[0.3em] block mb-2 ${special ? 'text-indigo-400' : 'text-white/30'}`}>{label}</span>
           {isEditable && isEditing ? (
-            <input autoFocus type="number" className="bg-transparent border-b border-blue-400 text-white font-mono font-black text-base outline-none w-24" value={localVal} onChange={e => setLocalVal(e.target.value)} onBlur={finishEdit} onKeyDown={e => e.key === 'Enter' && finishEdit()} />
+            <input autoFocus type="number" className="bg-transparent border-b-2 border-blue-400 text-white font-mono font-black text-lg outline-none w-28" value={localVal} onChange={e => setLocalVal(e.target.value)} onBlur={finishEdit} onKeyDown={e => e.key === 'Enter' && finishEdit()} />
           ) : (
-            <div className={`text-lg font-black font-mono tracking-tighter ${color} ${isEditable ? 'cursor-pointer hover:text-white transition-colors' : ''}`} onClick={() => isEditable && setIsEditing(true)}>
+            <div className={`text-lg md:text-xl font-black font-mono tracking-tighter ${color} ${isEditable ? 'cursor-pointer hover:text-white transition-colors' : ''}`} onClick={() => isEditable && setIsEditing(true)}>
               {(value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
             </div>
           )}
         </div>
-        <div className={`p-2 rounded-xl bg-white/5 ${color} group-hover:scale-110 transition-transform`}>
-          <Icon size={16} />
+        <div className={`p-2.5 rounded-2xl ${special ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/20' : 'bg-white/5 ' + color} group-hover:scale-110 transition-transform`}>
+          <Icon size={18} />
         </div>
       </div>
-      <span className="text-[7px] font-black text-white/20 uppercase tracking-widest">{sub}</span>
+      <span className={`text-[7px] font-black uppercase tracking-[0.2em] ${special ? 'text-indigo-400/60' : 'text-white/20'}`}>{sub}</span>
     </div>
   );
 };
@@ -141,42 +141,55 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
   });
 
   useEffect(() => {
-    if (!user) return;
-    const unsubData = onSnapshot(query(collection(db, `users/${user.uid}/data`)), (snap) => {
-      setAppState(prev => ({ ...prev, data: snap.docs.map(d => ({ ...d.data(), transactions: d.data().transactions || [], balances: d.data().balances || {}, cardDetails: d.data().cardDetails || {} } as FinancialData)) }));
-    });
-    const unsubProfile = onSnapshot(doc(db, `users/${user.uid}/profile`, 'settings'), (docSnap) => {
+    if (!user?.uid) return;
+
+    const profileRef = doc(db, `users/${user.uid}/profile`, 'settings');
+    const unsubProfile = onSnapshot(profileRef, (docSnap) => {
       if (docSnap.exists()) setAppState(prev => ({ ...prev, userProfile: docSnap.data() as UserProfile }));
     });
-    return () => { unsubData(); unsubProfile(); };
-  }, [user]);
+
+    const dataRef = collection(db, `users/${user.uid}/data`);
+    const unsubData = onSnapshot(query(dataRef), (snap) => {
+      setAppState(prev => ({ ...prev, data: snap.docs.map(d => ({ ...d.data() } as FinancialData)) }));
+    });
+
+    const catsRef = collection(db, `users/${user.uid}/categories`);
+    const unsubCats = onSnapshot(query(catsRef), (snap) => {
+      if (!snap.empty) setAppState(prev => ({ ...prev, categories: snap.docs.map(d => d.data() as Category) }));
+    });
+
+    const partnersRef = collection(db, `users/${user.uid}/partners`);
+    const unsubPartners = onSnapshot(query(partnersRef), (snap) => {
+      setAppState(prev => ({ ...prev, partners: snap.docs.map(d => d.data() as Partner) }));
+    });
+
+    return () => { unsubProfile(); unsubData(); unsubCats(); unsubPartners(); };
+  }, [user?.uid]);
 
   const currentMonthId = `${appState.currentYear}-${(MONTHS.indexOf(appState.currentMonth) + 1).toString().padStart(2, '0')}`;
   
   const handlePrevMonth = () => {
-    let idx = MONTHS.indexOf(appState.currentMonth);
-    if (idx === 0) {
-      setAppState(prev => ({ ...prev, currentMonth: MONTHS[11], currentYear: prev.currentYear - 1 }));
-    } else {
-      setAppState(prev => ({ ...prev, currentMonth: MONTHS[idx - 1] }));
-    }
+    setAppState(prev => {
+      let idx = MONTHS.indexOf(prev.currentMonth);
+      if (idx === 0) return { ...prev, currentMonth: MONTHS[11], currentYear: prev.currentYear - 1 };
+      return { ...prev, currentMonth: MONTHS[idx - 1] };
+    });
   };
 
   const handleNextMonth = () => {
-    let idx = MONTHS.indexOf(appState.currentMonth);
-    if (idx === 11) {
-      setAppState(prev => ({ ...prev, currentMonth: MONTHS[0], currentYear: prev.currentYear + 1 }));
-    } else {
-      setAppState(prev => ({ ...prev, currentMonth: MONTHS[idx + 1] }));
-    }
+    setAppState(prev => {
+      let idx = MONTHS.indexOf(prev.currentMonth);
+      if (idx === 11) return { ...prev, currentMonth: MONTHS[0], currentYear: prev.currentYear + 1 };
+      return { ...prev, currentMonth: MONTHS[idx + 1] };
+    });
   };
 
   const currentMonthData = useMemo(() => {
     const found = appState.data.find(d => `${d.year}-${(MONTHS.indexOf(d.month) + 1).toString().padStart(2, '0')}` === currentMonthId);
     const base = found || { month: appState.currentMonth, year: appState.currentYear, metaFaturamento: 0, transactions: [], balances: {}, cardDetails: {}, reserva: 0, investimento: 0, retorno: 0, reservaCurrency: 'BRL' as const };
     const assets = appState.userProfile.globalAssets || [];
-    const accounts = assets.filter(a => a.type === 'bank').map(a => ({ ...a, balance: base.balances[a.id] || 0 }));
-    const creditCards = assets.filter(a => a.type === 'card').map(a => ({ ...a, balance: base.balances[a.id] || 0, dueDate: base.cardDetails?.[a.id]?.dueDate || '10', situation: base.cardDetails?.[a.id]?.situation || 'PENDENTE' }));
+    const accounts = assets.filter(a => a.type === 'bank').map(a => ({ ...a, balance: (base.balances || {})[a.id] || 0 }));
+    const creditCards = assets.filter(a => a.type === 'card').map(a => ({ ...a, balance: (base.balances || {})[a.id] || 0, dueDate: base.cardDetails?.[a.id]?.dueDate || '10', situation: base.cardDetails?.[a.id]?.situation || 'PENDENTE' }));
     return { ...base, accounts, creditCards };
   }, [currentMonthId, appState.data, appState.userProfile]);
 
@@ -187,15 +200,18 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
     const availableCash = currentMonthData.accounts.reduce((a, b) => a + (b.balance || 0), 0);
     const pendingCardDebt = currentMonthData.creditCards.filter(c => c.situation !== 'PAGO').reduce((a, c) => a + (c.balance || 0), 0);
     const totalPendingOutflows = pendingExpenses + pendingCardDebt;
+    const reserve = currentMonthData.reserva || 0;
+    
     return { 
-      availableCash, pendingIncomes, totalPendingOutflows, pendingCardDebt,
+      availableCash, pendingIncomes, totalPendingOutflows, pendingCardDebt, reserve,
       totalExpenses: txs.filter(t => t.type === 'Despesa').reduce((a, t) => a + (t.value || 0), 0) + currentMonthData.creditCards.reduce((a, c) => a + (c.balance || 0), 0),
       totalIncomes: txs.filter(t => t.type === 'Receita').reduce((a, t) => a + (t.value || 0), 0),
-      reservaValue: currentMonthData.reserva || 0,
-      liquidHealthNoReserva: (availableCash + pendingIncomes) - totalPendingOutflows,
-      liquidHealthWithReserva: (availableCash + pendingIncomes + (currentMonthData.reserva || 0)) - totalPendingOutflows
+      liquidHealthNoReserve: (availableCash + pendingIncomes) - totalPendingOutflows,
+      liquidHealthWithReserve: (availableCash + pendingIncomes + reserve) - totalPendingOutflows
     };
   }, [currentMonthData]);
+
+  const hasHighRisk = totals.liquidHealthWithReserve < 0;
 
   const updateCardDetail = async (id: string, field: string, val: any) => {
     const details = { ...(currentMonthData.cardDetails || {}) };
@@ -203,93 +219,117 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
     await setDoc(doc(db, `users/${user.uid}/data`, currentMonthId), { ...currentMonthData, cardDetails: details }, { merge: true });
   };
 
+  const handleReorder = async (newTransactions: BaseTransaction[]) => {
+    await setDoc(doc(db, `users/${user.uid}/data`, currentMonthId), { ...currentMonthData, transactions: newTransactions }, { merge: true });
+  };
+
   const isTrial = appState.userProfile.subscriptionStatus === 'TRIAL';
   const isAdmin = ADMIN_EMAILS.includes((appState.userProfile.email || '').toLowerCase());
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] flex flex-col font-inter w-full items-center pb-24 md:pb-10 animate-in fade-in duration-500">
+    <div className="min-h-screen bg-[#f8fafc] flex flex-col font-inter w-full items-center pb-24 md:pb-10 animate-in fade-in duration-500 overflow-x-hidden">
       
       {isTrial && !isAdmin && (
-        <div className="bg-[#3b82f6] px-6 py-3 flex items-center justify-center gap-4 text-white sticky top-0 z-[110] w-full text-center">
+        <div className="bg-[#3b82f6] px-6 py-3.5 flex items-center justify-center gap-4 text-white sticky top-0 z-[110] w-full text-center shadow-lg">
           <Sparkles size={14} className="animate-pulse" />
-          <span className="text-[10px] font-black uppercase tracking-widest">Teste Ativo: Libere o comando definitivo</span>
-          <button onClick={() => setIsPricingOpen(true)} className="px-4 py-1.5 bg-white text-blue-600 rounded-full text-[9px] font-black uppercase shadow-lg">Ativar</button>
+          <span className="text-[10px] font-black uppercase tracking-[0.3em]">Teste Ativo: Libere o comando definitivo</span>
+          <button onClick={() => setIsPricingOpen(true)} className="px-5 py-1.5 bg-white text-blue-600 rounded-full text-[9px] font-black uppercase shadow-xl">Ativar</button>
         </div>
       )}
 
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-[100] backdrop-blur-xl w-full">
-        <div className="max-w-7xl mx-auto px-4 md:px-6 h-20 flex items-center justify-between">
+      <header className="bg-white/80 border-b border-slate-100 sticky top-0 z-[100] backdrop-blur-2xl w-full">
+        <div className="max-w-7xl mx-auto px-4 md:px-8 h-20 md:h-24 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-9 h-9 rounded-full border-2 border-indigo-400/30 text-indigo-600 font-black text-sm">T</div>
+            <div className="flex items-center justify-center w-10 h-10 md:w-11 md:h-11 rounded-[15px] bg-slate-900 text-white font-black text-sm shadow-xl">T</div>
             <div className="hidden sm:block">
-              <h1 className="text-sm font-black text-slate-900 tracking-tighter uppercase leading-none">Cria Gestão <span className="text-blue-500">Pro</span></h1>
-              <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mt-0.5">Thor4Tech</p>
+              <h1 className="text-sm font-black text-slate-900 uppercase leading-none tracking-tighter">Cria Gestão <span className="text-blue-500">Pro</span></h1>
+              <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mt-1">Thor4Tech</p>
             </div>
           </div>
 
-          <div className="flex items-center bg-slate-100/60 rounded-full p-1 border border-slate-200 shadow-inner scale-90 md:scale-100">
-            <button onClick={handlePrevMonth} className="p-2 hover:bg-white rounded-full transition-all text-slate-500"><ChevronLeft size={16} /></button>
-            <div className="px-4 text-center min-w-[120px]">
-              <span className="text-[10px] font-black text-slate-900 uppercase tracking-widest block leading-none">{appState.currentMonth}</span>
-              <span className="text-[8px] font-bold text-blue-500 block uppercase mt-0.5">{appState.currentYear}</span>
+          <div className="flex items-center bg-slate-100/80 rounded-full p-1 border border-slate-200 shadow-inner scale-[0.85] sm:scale-100">
+            <button onClick={handlePrevMonth} className="p-3 hover:bg-white rounded-full transition-all text-slate-500"><ChevronLeft size={18} /></button>
+            <div className="px-4 md:px-6 text-center min-w-[120px] md:min-w-[150px]">
+              <span className="text-[10px] md:text-[11px] font-black text-slate-900 uppercase tracking-widest block leading-none">{appState.currentMonth}</span>
+              <span className="text-[8px] md:text-[9px] font-bold text-blue-500 block uppercase mt-1">{appState.currentYear}</span>
             </div>
-            <button onClick={handleNextMonth} className="p-2 hover:bg-white rounded-full transition-all text-slate-500"><ChevronRight size={16} /></button>
+            <button onClick={handleNextMonth} className="p-3 hover:bg-white rounded-full transition-all text-slate-500"><ChevronRight size={18} /></button>
           </div>
 
           <div className="flex items-center gap-2">
-             <button onClick={() => setIsSettingsOpen(true)} className="p-2.5 bg-slate-50 border border-slate-200 text-slate-400 rounded-xl hover:text-blue-600 transition-all"><Settings size={18}/></button>
-             <button onClick={() => signOut(auth)} className="p-2.5 bg-rose-50 text-rose-500 rounded-xl hover:bg-rose-600 hover:text-white transition-all"><LogOut size={18}/></button>
+             <button onClick={() => setIsSettingsOpen(true)} className="p-2.5 bg-slate-50 border border-slate-100 text-slate-400 rounded-2xl hover:text-blue-600 hover:bg-white transition-all"><Settings size={20}/></button>
+             <button onClick={() => signOut(auth)} className="p-2.5 bg-rose-50 text-rose-500 rounded-2xl hover:bg-rose-600 hover:text-white transition-all shadow-sm"><LogOut size={20}/></button>
           </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 md:px-6 py-8 w-full space-y-8 flex flex-col items-center">
+      <main className="max-w-7xl mx-auto px-4 md:px-8 py-8 md:py-10 w-full space-y-8 flex flex-col items-center">
         
-        {/* MENU PILL MOBILE FRIENDLY */}
-        <div className="flex justify-center w-full sticky top-[84px] z-[90]">
-          <div className="flex items-center gap-1 p-1 bg-white/90 border border-slate-200 rounded-full shadow-2xl backdrop-blur-xl scale-100 md:scale-100">
+        <div className="flex justify-center w-full sticky top-[80px] md:top-[94px] z-[90]">
+          <div className="flex items-center gap-1 p-1 bg-white/90 border border-slate-200 rounded-full shadow-[0_20px_60px_-15px_rgba(0,0,0,0.15)] backdrop-blur-2xl scale-[0.95] md:scale-100">
             {[
               { id: 'dashboard', icon: LayoutDashboard, label: 'Painel' }, 
               { id: 'analytics', icon: BarChart3, label: 'Estratégia' }, 
-              { id: 'transactions', icon: List, label: 'Fluxo Real' }, 
+              { id: 'transactions', icon: List, label: 'Fluxos' }, 
               { id: 'partners', icon: Users, label: 'CRM' }, 
               { id: 'calendar', icon: Calendar, label: 'Agenda' }
             ].map(tab => (
               <button 
                 key={tab.id} 
                 onClick={() => setAppState(prev => ({ ...prev, view: tab.id as any }))}
-                className={`flex items-center gap-2 px-4 py-3 md:px-6 md:py-3.5 rounded-full text-[9px] font-black uppercase tracking-widest transition-all active:scale-95 ${appState.view === tab.id ? 'bg-[#020617] text-white shadow-xl' : 'text-slate-400 hover:bg-slate-50'}`}
+                className={`flex items-center gap-2 px-4 py-3 md:px-7 md:py-4 rounded-full text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 ${appState.view === tab.id ? 'bg-[#020617] text-white shadow-xl' : 'text-slate-400 hover:bg-slate-50'}`}
               >
-                <tab.icon size={16} /> <span className={showLabels ? 'inline' : 'hidden md:inline'}>{tab.label}</span>
+                <tab.icon size={16} /> <span className={showLabels ? 'inline' : 'hidden lg:inline'}>{tab.label}</span>
               </button>
             ))}
           </div>
         </div>
 
         {appState.view === 'dashboard' && (
-          <div className="space-y-8 w-full animate-in slide-in-from-bottom-5 duration-700">
-             {/* PAINEL DARK FLOW */}
-             <div className="bg-[#0f172a] p-6 md:p-10 rounded-[40px] shadow-4xl relative overflow-hidden border border-white/5">
-                <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 md:gap-6 relative z-10">
-                   <KPIItem label="Liquidez Real" value={totals.availableCash} color="text-white" icon={Wallet} sub="Bancos Conectados" />
-                   <KPIItem label="A Receber" value={totals.pendingIncomes} color="text-emerald-400" icon={ArrowUpRight} sub="Entradas Pendentes" />
+          <div className="space-y-8 w-full animate-in slide-in-from-bottom-5 duration-700 max-w-7xl">
+             {hasHighRisk && (
+               <div className="bg-rose-600/10 border-2 border-rose-500/20 p-4 rounded-[24px] flex items-center gap-4 animate-pulse">
+                  <div className="p-3 bg-rose-500 text-white rounded-2xl shadow-xl shadow-rose-200"><Bell size={20}/></div>
+                  <div>
+                    <h4 className="text-[10px] font-black text-rose-600 uppercase tracking-widest">Alerta de Risco</h4>
+                    <p className="text-[9px] font-medium text-rose-500/80 uppercase">Sua saúde patrimonial está negativa. Audite seus gastos agora.</p>
+                  </div>
+               </div>
+             )}
+
+             {/* PAINEL DARK FLOW OTIMIZADO */}
+             <div className="bg-[#0f172a] p-6 md:p-10 rounded-[40px] md:rounded-[48px] shadow-4xl relative overflow-hidden border border-white/5">
+                <div className="absolute top-0 right-0 p-10 opacity-5 text-blue-500 hidden md:block"><Activity size={200}/></div>
+                <div className="grid grid-cols-2 lg:grid-cols-6 gap-4 md:gap-5 relative z-10">
+                   <KPIItem label="Liquidez Real" value={totals.availableCash} color="text-white" icon={Wallet} sub="Disponível Banco" />
+                   <KPIItem label="A Receber" value={totals.pendingIncomes} color="text-emerald-400" icon={ArrowUpRight} sub="Entradas Mês" />
                    <KPIItem label="Dívida Total" value={totals.totalPendingOutflows} color="text-rose-400" icon={ArrowDownCircle} sub="Saídas + Faturas" />
-                   <KPIItem label="Reserva" isEditable value={totals.reservaValue} color="text-blue-400" icon={PiggyBank} sub="Fundo Estratégico" onUpdateValue={(v: number) => setDoc(doc(db, `users/${user.uid}/data`, currentMonthId), { ...currentMonthData, reserva: v }, { merge: true })} />
-                   <div className={`p-6 rounded-3xl border-2 flex flex-col justify-between ${totals.liquidHealthNoReserva >= 0 ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-rose-500/10 border-rose-500/20'}`}>
-                      <span className="text-[8px] font-black text-white/40 uppercase tracking-widest mb-4">Saúde Líquida</span>
-                      <div className={`text-xl font-black font-mono tracking-tighter ${totals.liquidHealthNoReserva >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                        {totals.liquidHealthNoReserva.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                   <KPIItem label="Reserva" isEditable value={totals.reserve} color="text-blue-400" icon={PiggyBank} sub="Fundo Estratégico" onUpdateValue={(v: number) => setDoc(doc(db, `users/${user.uid}/data`, currentMonthId), { ...currentMonthData, reserva: v }, { merge: true })} />
+                   
+                   <div className={`p-5 md:p-6 rounded-[32px] border-2 flex flex-col justify-between transition-all ${totals.liquidHealthNoReserve >= 0 ? 'bg-emerald-500/10 border-emerald-500/20 shadow-emerald-500/5' : 'bg-rose-500/10 border-rose-500/20 shadow-rose-500/5'}`}>
+                      <span className="text-[8px] font-black text-white/40 uppercase tracking-[0.2em] mb-3">Saúde (S/ Reserva)</span>
+                      <div className={`text-base md:text-lg font-black font-mono tracking-tighter ${totals.liquidHealthNoReserve >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                        {totals.liquidHealthNoReserve.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                       </div>
+                      <div className="mt-2 p-1.5 bg-white/5 rounded-xl self-end text-white/40"><Activity size={14}/></div>
+                   </div>
+
+                   <div className={`p-5 md:p-6 rounded-[32px] border-2 flex flex-col justify-between transition-all ${totals.liquidHealthWithReserve >= 0 ? 'bg-indigo-500/20 border-indigo-400/40 shadow-indigo-500/10' : 'bg-rose-500/20 border-rose-500/40 shadow-rose-500/10'}`}>
+                      <span className="text-[8px] font-black text-indigo-300 uppercase tracking-[0.2em] mb-3">Saúde (C/ Reserva)</span>
+                      <div className={`text-lg md:text-xl font-black font-mono tracking-tighter ${totals.liquidHealthWithReserve >= 0 ? 'text-indigo-400' : 'text-rose-400'}`}>
+                        {totals.liquidHealthWithReserve.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                      </div>
+                      <div className="mt-2 p-1.5 bg-indigo-500 text-white rounded-xl self-end shadow-md"><Shield size={14}/></div>
                    </div>
                 </div>
              </div>
 
              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-2 space-y-6">
-                   <div className="bg-white p-6 md:p-8 rounded-[40px] border border-slate-200 shadow-xl">
-                      <div className="flex justify-between items-center border-b border-slate-100 pb-4 mb-6">
-                        <h4 className="text-[10px] font-black text-slate-900 uppercase tracking-widest flex items-center gap-2"><Landmark size={16} className="text-blue-500" /> Bancos & Disponibilidade</h4>
-                        {activeAssetFilter && <button onClick={() => setActiveAssetFilter(null)} className="text-[8px] font-black text-rose-500 uppercase flex items-center gap-1 bg-rose-50 px-2 py-1 rounded-full"><FilterX size={10}/> Limpar</button>}
+                <div className="lg:col-span-2 space-y-8">
+                   <div className="bg-white p-6 md:p-8 rounded-[40px] border border-slate-100 shadow-2xl">
+                      <div className="flex justify-between items-center border-b border-slate-100 pb-5 mb-6">
+                        <h4 className="text-[11px] font-black text-slate-900 uppercase tracking-widest flex items-center gap-3"><Landmark size={18} className="text-blue-500" /> Bancos Operando</h4>
+                        {activeAssetFilter && <button onClick={() => setActiveAssetFilter(null)} className="text-[9px] font-black text-rose-500 uppercase flex items-center gap-2 bg-rose-50 px-3 py-1.5 rounded-full border border-rose-100"><FilterX size={12}/> Limpar</button>}
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         {currentMonthData.accounts.map(acc => (
@@ -302,9 +342,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                       </div>
                    </div>
                 </div>
-                <div className="bg-white p-6 md:p-8 rounded-[40px] border border-slate-200 shadow-xl">
-                   <div className="flex justify-between items-center border-b border-slate-100 pb-4 mb-6">
-                     <h4 className="text-[10px] font-black text-slate-900 uppercase tracking-widest flex items-center gap-2"><CardIcon size={16} className="text-rose-500" /> Faturas Cartão</h4>
+                <div className="bg-white p-6 md:p-8 rounded-[40px] border border-slate-100 shadow-2xl">
+                   <div className="flex justify-between items-center border-b border-slate-100 pb-5 mb-6">
+                     <h4 className="text-[11px] font-black text-slate-900 uppercase tracking-widest flex items-center gap-3"><CardIcon size={18} className="text-rose-500" /> Faturas Cartão</h4>
                    </div>
                    <div className="space-y-4">
                      {currentMonthData.creditCards.map(card => (
@@ -329,41 +369,59 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
         )}
 
         {appState.view === 'transactions' && (
-          <div className="w-full space-y-6">
-            <div className="flex justify-between items-center bg-white p-4 rounded-3xl border border-slate-200 shadow-sm w-full">
+          <div className="w-full space-y-8 animate-in fade-in duration-500 max-w-7xl mx-auto">
+            <div className="flex justify-between items-center bg-white p-4 md:p-5 rounded-[32px] border border-slate-100 shadow-2xl w-full">
               <button 
-                onClick={() => {/* Duplicar logic */}} 
-                className="flex items-center gap-2 px-5 py-2.5 bg-blue-50 text-blue-600 rounded-2xl text-[9px] font-black uppercase tracking-widest hover:bg-blue-600 hover:text-white transition-all group"
+                onClick={async () => {
+                  const prevIdx = MONTHS.indexOf(appState.currentMonth) - 1;
+                  const prevYear = prevIdx < 0 ? appState.currentYear - 1 : appState.currentYear;
+                  const prevMonth = MONTHS[prevIdx < 0 ? 11 : prevIdx];
+                  const prevId = `${prevYear}-${(MONTHS.indexOf(prevMonth) + 1).toString().padStart(2, '0')}`;
+                  const prevSnap = await getDoc(doc(db, `users/${user.uid}/data`, prevId));
+                  if(prevSnap.exists()){
+                     const prevTxs = (prevSnap.data().transactions || []) as BaseTransaction[];
+                     const recurring = prevTxs.filter(t => t.isRecurring).map(t => ({...t, id: Math.random().toString(36).substr(2,9), situation: 'PENDENTE' as Situation, monthRef: currentMonthId}));
+                     await setDoc(doc(db, `users/${user.uid}/data`, currentMonthId), { ...currentMonthData, transactions: [...currentMonthData.transactions, ...recurring] }, { merge: true });
+                     alert("Fluxos clonados com sucesso!");
+                  }
+                }} 
+                className="flex items-center gap-2 px-5 py-3 bg-blue-50 text-blue-600 rounded-[20px] text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 hover:text-white transition-all group"
               >
-                <Copy size={14} /> Clonar Anterior
+                <Copy size={16} /> Clonar Anterior
               </button>
               {activeAssetFilter && (
-                <div className="flex items-center gap-2 bg-blue-50/50 px-4 py-2 rounded-xl border border-blue-100">
-                   <span className="text-[9px] font-black text-blue-600 uppercase">Auditando Ativo</span>
-                   <button onClick={() => setActiveAssetFilter(null)} className="p-1 text-rose-500"><X size={14}/></button>
+                <div className="flex items-center gap-3 bg-blue-50/50 px-5 py-3 rounded-[20px] border border-blue-100">
+                   <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                   <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest">Auditoria em Andamento</span>
+                   <button onClick={() => setActiveAssetFilter(null)} className="p-1.5 text-rose-500 bg-white rounded-lg shadow-sm"><X size={16}/></button>
                 </div>
               )}
             </div>
-            <SplitTransactionView 
-              transactions={activeAssetFilter ? currentMonthData.transactions.filter(t => t.paymentMethod === activeAssetFilter) : currentMonthData.transactions} 
-              categories={appState.categories} 
-              partners={appState.partners} 
-              onToggleStatus={async id => {
-                const txs = currentMonthData.transactions.map(t => t.id === id ? { ...t, situation: (t.situation === 'PAGO' ? 'PENDENTE' : 'PAGO') as Situation } : t);
-                await setDoc(doc(db, `users/${user.uid}/data`, currentMonthId), { ...currentMonthData, transactions: txs }, { merge: true });
-              }} 
-              onDelete={async id => {
-                 const txs = currentMonthData.transactions.filter(t => t.id !== id);
-                 await setDoc(doc(db, `users/${user.uid}/data`, currentMonthId), { ...currentMonthData, transactions: txs }, { merge: true });
-              }} 
-              onEdit={tx => { setEditingTransaction(tx); setIsModalOpen(true); }} 
-              onAddNew={type => { setModalPreType(type); setEditingTransaction(undefined); setIsModalOpen(true); }} 
-              onQuickUpdate={async (id, f, v) => {
-                const txs = currentMonthData.transactions.map(t => t.id === id ? { ...t, [f]: v } : t);
-                await setDoc(doc(db, `users/${user.uid}/data`, currentMonthId), { ...currentMonthData, transactions: txs }, { merge: true });
-              }} 
-              totals={totals} 
-            />
+            <div className="w-full">
+              <SplitTransactionView 
+                transactions={activeAssetFilter ? currentMonthData.transactions.filter(t => t.paymentMethod === activeAssetFilter) : currentMonthData.transactions} 
+                categories={appState.categories} 
+                partners={appState.partners} 
+                onToggleStatus={async id => {
+                  const txs = currentMonthData.transactions.map(t => t.id === id ? { ...t, situation: (t.situation === 'PAGO' ? 'PENDENTE' : 'PAGO') as Situation } : t);
+                  await setDoc(doc(db, `users/${user.uid}/data`, currentMonthId), { ...currentMonthData, transactions: txs }, { merge: true });
+                }} 
+                onDelete={async id => {
+                 if(confirm("Excluir este lançamento?")){
+                   const txs = currentMonthData.transactions.filter(t => t.id !== id);
+                   await setDoc(doc(db, `users/${user.uid}/data`, currentMonthId), { ...currentMonthData, transactions: txs }, { merge: true });
+                 }
+                }} 
+                onEdit={tx => { setEditingTransaction(tx); setIsModalOpen(true); }} 
+                onAddNew={type => { setModalPreType(type); setEditingTransaction(undefined); setIsModalOpen(true); }} 
+                onQuickUpdate={async (id, f, v) => {
+                  const txs = currentMonthData.transactions.map(t => t.id === id ? { ...t, [f]: v } : t);
+                  await setDoc(doc(db, `users/${user.uid}/data`, currentMonthId), { ...currentMonthData, transactions: txs }, { merge: true });
+                }} 
+                totals={totals} 
+                onReorder={handleReorder}
+              />
+            </div>
           </div>
         )}
         
