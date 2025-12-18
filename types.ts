@@ -53,6 +53,7 @@ export interface UserProfile {
   name: string;
   company: string;
   avatar?: string;
+  defaultMeta?: number;
   globalAssets?: AssetMetadata[]; 
 }
 

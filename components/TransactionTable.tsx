@@ -77,20 +77,22 @@ const TransactionTable: React.FC<Props> = ({ title, color, data, categories, par
 
   return (
     <div className="bg-white rounded-[40px] md:rounded-[48px] shadow-2xl border border-slate-200 overflow-hidden flex flex-col h-full transition-all duration-500 hover:shadow-3xl">
-      {/* Cabeçalho Estilo Mobile App */}
-      <div className={`px-6 md:px-10 py-8 md:py-10 flex justify-between items-center ${color} relative overflow-hidden`}>
+      <div className={`px-6 md:px-10 py-10 md:py-12 flex justify-between items-center ${color} relative overflow-hidden`}>
         <div className="absolute top-0 right-0 w-64 md:w-80 h-64 md:h-80 bg-white/5 rounded-full -mr-24 md:-mr-32 -mt-24 md:-mt-32 blur-3xl"></div>
         <div className="flex items-center gap-4 md:gap-6 relative z-10 text-white">
-          <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-white/20 flex items-center justify-center backdrop-blur-md border border-white/20 shadow-lg">
-            <Tag size={20} md={28} />
+          <div className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-white/20 flex items-center justify-center backdrop-blur-md border border-white/20 shadow-lg">
+            <Tag size={24} />
           </div>
           <div>
-            <h3 className="font-black uppercase tracking-widest text-[11px] md:text-[14px] leading-tight max-w-[150px] md:max-w-none">{title}</h3>
-            <p className="text-white/60 text-[9px] md:text-[10px] font-bold uppercase mt-1 tracking-widest">{data.length} Lançamentos</p>
+            <h3 className="font-black uppercase tracking-widest text-[12px] md:text-[14px] leading-tight max-w-[160px] md:max-w-none">{title}</h3>
+            <p className="text-white/60 text-[10px] md:text-[10px] font-bold uppercase mt-1 tracking-widest">{data.length} Lançamentos</p>
           </div>
         </div>
-        <button onClick={onAddNew} className="w-12 h-12 md:w-16 md:h-16 bg-white text-indigo-900 rounded-[20px] md:rounded-[24px] shadow-2xl relative z-10 hover:scale-110 active:scale-95 transition-all flex items-center justify-center">
-          <Plus size={24} md={32} strokeWidth={3} />
+        <button 
+          onClick={onAddNew} 
+          className="w-14 h-14 md:w-16 md:h-16 bg-white text-indigo-950 rounded-full md:rounded-[24px] shadow-[0_10px_30px_rgba(0,0,0,0.15)] relative z-10 hover:scale-110 active:scale-95 transition-all flex items-center justify-center border-4 border-white/20"
+        >
+          <Plus size={28} strokeWidth={4} />
         </button>
       </div>
 
@@ -98,13 +100,13 @@ const TransactionTable: React.FC<Props> = ({ title, color, data, categories, par
         <table className="w-full text-left border-collapse min-w-[650px]">
           <thead>
             <tr className="bg-slate-50 text-slate-400 text-[8px] md:text-[9px] font-black uppercase tracking-[0.3em] border-b border-slate-100">
-              <th className="px-3 md:px-4 py-5 w-8"></th>
-              <th className="px-6 md:px-8 py-5">Data</th>
-              <th className="px-6 md:px-8 py-5">Lançamento</th>
-              <th className="px-6 md:px-8 py-5">Valor</th>
-              <th className="px-6 md:px-8 py-5">Categoria</th>
-              <th className="px-6 md:px-8 py-5 text-center">Status</th>
-              <th className="px-6 md:px-8 py-5 text-right">Ações</th>
+              <th className="px-3 md:px-4 py-6 w-8"></th>
+              <th className="px-6 md:px-8 py-6">Data</th>
+              <th className="px-6 md:px-8 py-6">Lançamento</th>
+              <th className="px-6 md:px-8 py-6">Valor</th>
+              <th className="px-6 md:px-8 py-6">Categoria</th>
+              <th className="px-6 md:px-8 py-6 text-center">Status</th>
+              <th className="px-6 md:px-8 py-6 text-right">Ações</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
@@ -126,7 +128,7 @@ const TransactionTable: React.FC<Props> = ({ title, color, data, categories, par
                     {editingValueId === item.id ? (
                       <input autoFocus type="number" step="0.01" className="w-20 bg-white border-2 border-indigo-200 rounded-xl px-2 py-1 font-mono font-black text-[10px] outline-none" value={localVal} onChange={e => setLocalVal(e.target.value)} onBlur={() => { onQuickUpdate(item.id, 'value', parseFloat(localVal) || 0); setEditingValueId(null); }} />
                     ) : (
-                      <span onClick={() => { setEditingValueId(item.id); setLocalVal(item.value.toString()); }} className={`text-[12px] md:text-[14px] font-black font-mono tracking-tighter cursor-pointer px-2 py-1 rounded-lg ${item.type === 'Receita' ? 'text-emerald-600' : 'text-slate-800'}`}>{item.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                      <span onClick={() => { setEditingValueId(item.id); setLocalVal(item.value.toString()); }} className={`text-[12px] md:text-[14px] font-black font-mono tracking-tighter cursor-pointer px-2 py-1 rounded-lg ${item.type === 'Receita' ? 'text-emerald-600' : 'text-slate-800'}`}>{(item.value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
                     )}
                   </td>
                   <td className="px-6 md:px-8 py-5 relative">
@@ -146,17 +148,15 @@ const TransactionTable: React.FC<Props> = ({ title, color, data, categories, par
         </table>
       </div>
 
-      {/* RODAPÉ ESTRATÉGICO CONSOLIDADO */}
       <div className="bg-slate-100 border-t border-slate-200 p-6 md:p-8">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 md:gap-6">
-          
           <div className="bg-white p-5 md:p-6 rounded-[28px] md:rounded-[32px] border border-slate-200 shadow-sm flex flex-col justify-between group">
             <div className="flex justify-between items-start mb-2">
               <span className="text-[8px] md:text-[9px] font-black text-slate-500 uppercase tracking-widest leading-none">Bancos (Atual)</span>
               <div className="p-2 bg-slate-50 rounded-xl text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-all"><Wallet size={14} /></div>
             </div>
             <div className="text-[13px] md:text-[15px] font-black text-slate-900 font-mono tracking-tighter">
-              {totals.availableCash.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+              {(totals.availableCash || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
             </div>
             <span className="text-[7px] md:text-[8px] font-black text-slate-400 uppercase mt-2 tracking-widest">Disponibilidade real</span>
           </div>
@@ -167,7 +167,7 @@ const TransactionTable: React.FC<Props> = ({ title, color, data, categories, par
               <div className="p-2 bg-emerald-50 rounded-xl text-emerald-500"><ArrowUpRight size={14} /></div>
             </div>
             <div className="text-[13px] md:text-[15px] font-black text-emerald-600 font-mono tracking-tighter">
-              {totals.pendingIncomes.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+              {(totals.pendingIncomes || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
             </div>
             <span className="text-[7px] md:text-[8px] font-black text-slate-400 uppercase mt-2 tracking-widest">Entradas pendentes</span>
           </div>
@@ -178,9 +178,9 @@ const TransactionTable: React.FC<Props> = ({ title, color, data, categories, par
               <div className="p-2 bg-rose-50 rounded-xl text-rose-500"><ArrowDownCircle size={14} /></div>
             </div>
             <div className="text-[13px] md:text-[15px] font-black text-rose-600 font-mono tracking-tighter">
-              {totals.totalPendingOutflows.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+              {(totals.totalPendingOutflows || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
             </div>
-            <span className="text-[7px] md:text-[8px] font-black text-rose-400 uppercase mt-2 font-bold leading-none">Cartão: R$ {totals.pendingCardDebt.toLocaleString('pt-BR')}</span>
+            <span className="text-[7px] md:text-[8px] font-black text-rose-400 uppercase mt-2 font-bold leading-none">Cartão: R$ {(totals.pendingCardDebt || 0).toLocaleString('pt-BR')}</span>
           </div>
 
           <div className="bg-white p-5 md:p-6 rounded-[28px] md:rounded-[32px] border border-slate-200 shadow-sm flex flex-col justify-between group">
@@ -189,7 +189,7 @@ const TransactionTable: React.FC<Props> = ({ title, color, data, categories, par
               <div className="p-2 bg-indigo-50 rounded-xl text-indigo-500"><PiggyBank size={14} /></div>
             </div>
             <div className="text-[13px] md:text-[15px] font-black text-indigo-600 font-mono tracking-tighter">
-              {totals.reservaValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+              {(totals.reservaValue || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
             </div>
             <span className="text-[7px] md:text-[8px] font-black text-slate-400 uppercase mt-2 tracking-widest">Bloco de investimento</span>
           </div>
@@ -200,14 +200,13 @@ const TransactionTable: React.FC<Props> = ({ title, color, data, categories, par
               <div className="p-2 bg-white/20 rounded-xl text-white backdrop-blur-md"><ShieldCheck size={14} /></div>
             </div>
             <div className="text-[15px] md:text-[17px] font-black font-mono tracking-tighter leading-none mb-2">
-              {totals.liquidHealthNoReserva.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+              {(totals.liquidHealthNoReserva || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
             </div>
             <div className="border-t border-white/20 pt-2 flex justify-between items-center">
                <span className="text-[6px] font-black uppercase text-white/50 tracking-widest">Com Reserva:</span>
-               <span className="text-[8px] md:text-[9px] font-black font-mono text-white/80">{totals.liquidHealthWithReserva.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+               <span className="text-[8px] md:text-[9px] font-black font-mono text-white/80">{(totals.liquidHealthWithReserva || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
             </div>
           </div>
-
         </div>
       </div>
     </div>
