@@ -14,9 +14,10 @@ interface Props {
   onQuickUpdate: (id: string, field: keyof BaseTransaction, value: any) => void;
   totals: any;
   onReorder?: (newData: BaseTransaction[]) => void;
+  showValues?: boolean;
 }
 
-const SplitTransactionView: React.FC<Props> = ({ transactions, categories, partners, onToggleStatus, onDelete, onEdit, onAddNew, onQuickUpdate, totals, onReorder }) => {
+const SplitTransactionView: React.FC<Props> = ({ transactions, categories, partners, onToggleStatus, onDelete, onEdit, onAddNew, onQuickUpdate, totals, onReorder, showValues = true }) => {
   const [activeView, setActiveView] = useState<'both' | 'income' | 'expense'>('both');
   
   const incomes = transactions.filter(t => t.type === 'Receita');
@@ -32,9 +33,9 @@ const SplitTransactionView: React.FC<Props> = ({ transactions, categories, partn
   };
 
   return (
-    <div className="space-y-6 md:space-y-10 animate-in fade-in duration-500">
+    <div className="space-y-6 md:space-y-10 animate-in fade-in duration-500 w-full max-w-full">
       <div className="flex justify-center sticky top-[150px] md:top-[160px] z-[85]">
-        <div className="flex p-1 bg-white border border-slate-100 rounded-full shadow-2xl backdrop-blur-xl w-full max-w-[320px] md:max-w-sm">
+        <div className="flex p-1 bg-white/90 border border-slate-200 rounded-full shadow-2xl backdrop-blur-xl w-full max-w-[320px] md:max-w-sm">
            <button 
              onClick={() => setActiveView('income')} 
              className={`flex-1 px-4 py-2.5 md:py-3 text-[9px] md:text-[10px] font-black uppercase tracking-widest rounded-full transition-all ${activeView === 'income' ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-50'}`}
@@ -56,9 +57,10 @@ const SplitTransactionView: React.FC<Props> = ({ transactions, categories, partn
         </div>
       </div>
 
-      <div className={`grid grid-cols-1 ${activeView === 'both' ? 'lg:grid-cols-2' : 'grid-cols-1'} gap-8 lg:gap-12`}>
-        <div className={`space-y-6 ${activeView === 'expense' ? 'hidden' : 'block'}`}>
+      <div className={`grid grid-cols-1 ${activeView === 'both' ? 'xl:grid-cols-2' : 'grid-cols-1'} gap-8 xl:gap-10 w-full`}>
+        <div className={`w-full transition-all duration-500 ${activeView === 'expense' ? 'hidden' : 'block'}`}>
           <TransactionTable 
+            showValues={showValues}
             title="FLUXO DE ENTRADAS" 
             color="bg-emerald-600"
             data={incomes}
@@ -73,8 +75,9 @@ const SplitTransactionView: React.FC<Props> = ({ transactions, categories, partn
             onReorder={(data) => handleReorder('Receita', data)}
           />
         </div>
-        <div className={`space-y-6 ${activeView === 'income' ? 'hidden' : 'block'}`}>
+        <div className={`w-full transition-all duration-500 ${activeView === 'income' ? 'hidden' : 'block'}`}>
           <TransactionTable 
+            showValues={showValues}
             title="FLUXO DE SAÍDAS" 
             color="bg-[#020617]"
             data={expenses}

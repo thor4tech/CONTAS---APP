@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { BaseTransaction, Category, Partner } from '../types';
-import { Trash2, Tag, Plus, Edit3, Wallet, ArrowUpRight, ArrowDownCircle, ChevronDown, CalendarDays, GripVertical, ShieldCheck, PiggyBank, Activity } from 'lucide-react';
+import { Trash2, Tag, Plus, Edit3, Wallet, ArrowUpRight, ArrowDownCircle, ChevronDown, CalendarDays, GripVertical, ShieldCheck, PiggyBank, Activity, Shield, TrendingUp, TrendingDown, Clock, CheckCircle2, AlertCircle } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -18,9 +18,10 @@ interface Props {
   onQuickUpdate: (id: string, field: keyof BaseTransaction, value: any) => void;
   totals: any;
   onReorder?: (newData: BaseTransaction[]) => void;
+  showValues?: boolean;
 }
 
-const TransactionTable: React.FC<Props> = ({ title, color, data, categories, partners, onToggleStatus, onDelete, onEdit, onAddNew, onQuickUpdate, totals, onReorder }) => {
+const TransactionTable: React.FC<Props> = ({ title, color, data, categories, partners, onToggleStatus, onDelete, onEdit, onAddNew, onQuickUpdate, totals, onReorder, showValues = true }) => {
   const [editingValueId, setEditingValueId] = useState<string | null>(null);
   const [localVal, setLocalVal] = useState("");
   const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
@@ -28,15 +29,8 @@ const TransactionTable: React.FC<Props> = ({ title, color, data, categories, par
   const getCategory = (id: string) => categories.find(c => c.id === id) || categories[0] || { name: 'S/ Cat', color: 'bg-slate-100 text-slate-400', icon: '❓' };
   const formatDateLabel = (dateStr: string) => { try { if (!dateStr) return '--/--'; const date = parseISO(dateStr); return format(date, 'dd/MM', { locale: ptBR }); } catch { return '--/--'; } };
 
-  // Handlers para Drag and Drop
-  const handleDragStart = (idx: number) => {
-    setDraggedIdx(idx);
-  };
-
-  const handleDragOver = (e: React.DragEvent, idx: number) => {
-    e.preventDefault();
-  };
-
+  const handleDragStart = (idx: number) => setDraggedIdx(idx);
+  const handleDragOver = (e: React.DragEvent, idx: number) => e.preventDefault();
   const handleDrop = (idx: number) => {
     if (draggedIdx === null || draggedIdx === idx || !onReorder) return;
     const newData = [...data];
@@ -46,17 +40,27 @@ const TransactionTable: React.FC<Props> = ({ title, color, data, categories, par
     setDraggedIdx(null);
   };
 
+  const isIncome = title.includes("ENTRADAS");
+  const tableTotal = data.reduce((a, t) => a + (t.value || 0), 0);
+  const tablePaid = data.filter(t => t.situation === 'PAGO').reduce((a, t) => a + (t.value || 0), 0);
+  const tableRemaining = data.filter(t => t.situation !== 'PAGO').reduce((a, t) => a + (t.value || 0), 0);
+
+  const formatValue = (v: number) => {
+    if (!showValues) return 'R$ ••••••';
+    return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  };
+
   return (
     <div className="bg-white rounded-[40px] md:rounded-[56px] shadow-3xl border border-slate-100 overflow-hidden flex flex-col h-full transition-all hover:shadow-4xl">
       <div className={`px-6 py-8 md:px-8 md:py-10 flex justify-between items-center ${color} relative overflow-hidden`}>
         <div className="absolute top-0 right-0 p-8 md:p-12 opacity-10 text-white rotate-12"><Activity size={100}/></div>
         <div className="flex items-center gap-4 md:gap-5 relative z-10 text-white">
           <div className="w-12 h-12 md:w-14 md:h-14 rounded-[18px] md:rounded-3xl bg-white/20 flex items-center justify-center backdrop-blur-md border border-white/20 shadow-2xl">
-            <Tag size={24} />
+            {isIncome ? <TrendingUp size={24} /> : <TrendingDown size={24} />}
           </div>
           <div>
             <h3 className="font-black uppercase tracking-[0.2em] md:tracking-[0.3em] text-[11px] md:text-[14px] leading-tight">{title}</h3>
-            <p className="text-white/60 text-[9px] md:text-[10px] font-bold uppercase mt-2 tracking-widest">{data.length} Lançamentos</p>
+            <p className="text-white/60 text-[9px] md:text-[10px] font-bold uppercase mt-2 tracking-widest">{data.length} Transações</p>
           </div>
         </div>
         <button onClick={onAddNew} className="w-12 h-12 md:w-14 md:h-14 bg-white text-[#020617] rounded-[18px] md:rounded-3xl shadow-4xl hover:scale-110 active:scale-95 transition-all flex items-center justify-center relative z-10 group">
@@ -96,7 +100,7 @@ const TransactionTable: React.FC<Props> = ({ title, color, data, categories, par
                   </td>
                   <td className="px-4 py-5 md:px-6 md:py-6">
                     <div className="text-[11px] md:text-[12px] font-black text-slate-900 truncate max-w-[150px] md:max-w-[200px] uppercase tracking-tight">{item.description}</div>
-                    <div className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-[7px] md:text-[8px] font-black uppercase tracking-widest mt-2 border ${cat.color.replace('text-', 'border-').replace('700', '200')} ${cat.color.replace('text-', 'bg-').replace('700', '50')} ${cat.color}`}>
+                    <div className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-[7px] md:text-[8px] font-black uppercase tracking-widest mt-2 border ${cat.color.replace('text-', 'border-').replace('700', '200')} ${cat.color.replace('text-', 'bg-').replace('700', '50')} ${cat.color}`}>
                       {cat.icon} {cat.name}
                     </div>
                   </td>
@@ -104,7 +108,7 @@ const TransactionTable: React.FC<Props> = ({ title, color, data, categories, par
                     {editingValueId === item.id ? (
                       <input autoFocus type="number" step="0.01" className="w-24 bg-white border-2 border-blue-200 rounded-xl px-3 py-1 font-mono font-black text-[12px] outline-none shadow-inner" value={localVal} onChange={e => setLocalVal(e.target.value)} onBlur={() => { onQuickUpdate(item.id, 'value', parseFloat(localVal) || 0); setEditingValueId(null); }} />
                     ) : (
-                      <span onClick={() => { setEditingValueId(item.id); setLocalVal(item.value.toString()); }} className={`text-[12px] md:text-[13px] font-black font-mono tracking-tighter cursor-pointer px-2 py-1 rounded-lg hover:bg-blue-50 transition-all ${item.type === 'Receita' ? 'text-emerald-600' : 'text-slate-900'}`}>{(item.value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                      <span onClick={() => { setEditingValueId(item.id); setLocalVal(item.value.toString()); }} className={`text-[12px] md:text-[13px] font-black font-mono tracking-tighter cursor-pointer px-2 py-1 rounded-lg hover:bg-blue-50 transition-all ${item.type === 'Receita' ? 'text-emerald-600' : 'text-slate-900'}`}>{formatValue(item.value || 0)}</span>
                     )}
                   </td>
                   <td className="px-4 py-5 md:px-6 md:py-6 text-center">
@@ -123,22 +127,38 @@ const TransactionTable: React.FC<Props> = ({ title, color, data, categories, par
         </table>
       </div>
 
-      <div className="bg-slate-100/50 border-t border-slate-100 p-4 md:p-6 grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-          <div className="bg-white p-4 md:p-5 rounded-[24px] md:rounded-[28px] border border-slate-100 shadow-xl">
-            <span className="text-[7px] md:text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1 md:mb-2">Disponibilidade</span>
-            <div className="text-[11px] md:text-[13px] font-black text-slate-900 font-mono tracking-tighter">{(totals.availableCash || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
+      {/* RODAPÉ ESTRATÉGICO OTIMIZADO */}
+      <div className="bg-slate-50 border-t border-slate-100 p-5 md:p-8 grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+          <div className="bg-white p-4 md:p-5 rounded-[28px] border border-slate-100 shadow-xl flex flex-col justify-between group hover:border-indigo-200 transition-all">
+            <div className="flex justify-between items-start mb-2">
+              <span className="text-[8px] md:text-[9px] font-black text-slate-400 uppercase tracking-widest">{isIncome ? 'Faturamento Total' : 'Dívida Total'}</span>
+              <div className={`flex items-center justify-center p-1.5 rounded-lg group-hover:bg-slate-900 group-hover:text-white transition-all bg-slate-100 text-slate-400`}><Activity size={12}/></div>
+            </div>
+            <div className="text-[12px] md:text-[14px] font-black text-slate-900 font-mono tracking-tighter">{formatValue(tableTotal)}</div>
           </div>
-          <div className="bg-white p-4 md:p-5 rounded-[24px] md:rounded-[28px] border border-slate-100 shadow-xl">
-            <span className="text-[7px] md:text-[9px] font-black text-emerald-500 uppercase tracking-widest block mb-1 md:mb-2">Total Entradas</span>
-            <div className="text-[11px] md:text-[13px] font-black text-emerald-600 font-mono tracking-tighter">{(totals.totalIncomes || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
+
+          <div className="bg-white p-4 md:p-5 rounded-[28px] border border-slate-100 shadow-xl flex flex-col justify-between group hover:border-emerald-200 transition-all">
+            <div className="flex justify-between items-start mb-2">
+              <span className="text-[8px] md:text-[9px] font-black text-emerald-500 uppercase tracking-widest">{isIncome ? 'Recebido' : 'Pago'}</span>
+              <div className="flex items-center justify-center p-1.5 bg-emerald-50 text-emerald-400 rounded-lg group-hover:bg-emerald-500 group-hover:text-white transition-all"><CheckCircle2 size={12}/></div>
+            </div>
+            <div className="text-[12px] md:text-[14px] font-black text-emerald-600 font-mono tracking-tighter">{formatValue(tablePaid)}</div>
           </div>
-          <div className={`p-4 md:p-5 rounded-[24px] md:rounded-[28px] border-2 flex flex-col justify-center shadow-xl transition-all ${totals.liquidHealthNoReserva >= 0 ? 'bg-emerald-600 border-emerald-500 text-white shadow-emerald-500/20' : 'bg-rose-600 border-rose-500 text-white shadow-rose-500/20'}`}>
-            <span className="text-[7px] md:text-[9px] font-black text-white/70 uppercase tracking-widest mb-0.5 md:mb-1">Saúde Líquida</span>
-            <div className="text-[13px] md:text-[15px] font-black font-mono tracking-tighter leading-none">{(totals.liquidHealthNoReserva || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
+
+          <div className="bg-white p-4 md:p-5 rounded-[28px] border border-slate-100 shadow-xl flex flex-col justify-between group hover:border-amber-200 transition-all">
+            <div className="flex justify-between items-start mb-2">
+              <span className="text-[8px] md:text-[9px] font-black text-amber-500 uppercase tracking-widest">{isIncome ? 'Pendente' : 'Restante'}</span>
+              <div className="flex items-center justify-center p-1.5 bg-amber-50 text-amber-400 rounded-lg group-hover:bg-amber-500 group-hover:text-white transition-all"><Clock size={12}/></div>
+            </div>
+            <div className="text-[12px] md:text-[14px] font-black text-amber-600 font-mono tracking-tighter">{formatValue(tableRemaining)}</div>
           </div>
-          <div className="bg-white p-4 md:p-5 rounded-[24px] md:rounded-[28px] border border-slate-100 shadow-xl">
-            <span className="text-[7px] md:text-[9px] font-black text-rose-500 uppercase tracking-widest block mb-1 md:mb-2">Dívida Total</span>
-            <div className="text-[11px] md:text-[13px] font-black text-rose-600 font-mono tracking-tighter">{(totals.totalPendingOutflows || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
+
+          <div className={`p-4 md:p-5 rounded-[28px] border-2 flex flex-col justify-between shadow-xl transition-all ${totals.liquidHealthNoReserve >= 0 ? 'bg-emerald-600 border-emerald-500 text-white' : 'bg-rose-600 border-rose-500 text-white'}`}>
+            <div className="flex justify-between items-start mb-2">
+              <span className="text-[8px] md:text-[9px] font-black text-white/70 uppercase tracking-widest">{totals.liquidHealthNoReserve >= 0 ? 'Sobra Projetada' : 'Falta Projetada'}</span>
+              <div className="flex items-center justify-center p-1.5 bg-white/10 rounded-lg text-white">{totals.liquidHealthNoReserve >= 0 ? <Shield size={12}/> : <AlertCircle size={12}/>}</div>
+            </div>
+            <div className="text-[14px] md:text-[16px] font-black font-mono tracking-tighter leading-none">{formatValue(totals.liquidHealthNoReserve || 0)}</div>
           </div>
       </div>
     </div>
