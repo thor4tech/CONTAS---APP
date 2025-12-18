@@ -2,6 +2,8 @@
 export type Situation = 'PAGO' | 'PENDENTE' | 'AGENDADO' | 'CANCELADO';
 export type PaymentType = 'Receita' | 'Despesa';
 export type Currency = 'BRL' | 'EUR';
+export type PlanId = 'ESSENTIAL' | 'PRO' | 'MASTER';
+export type SubscriptionStatus = 'TRIAL' | 'ACTIVE' | 'EXPIRED' | 'CANCELED' | 'PENDING';
 
 export interface Category {
   id: string;
@@ -50,11 +52,30 @@ export interface CreditCardItem extends AssetMetadata {
 }
 
 export interface UserProfile {
+  email: string;
   name: string;
   company: string;
   avatar?: string;
   defaultMeta?: number;
   globalAssets?: AssetMetadata[]; 
+  
+  // Gestão de Planos e SaaS
+  planId: PlanId;
+  subscriptionStatus: SubscriptionStatus;
+  createdAt: string; // ISO String
+  trialEnd: string;   // ISO String (createdAt + 7 days)
+  subscriptionId?: string;
+  nextPayment?: string;
+  
+  // Marketing & UTMs
+  utm_source?: string | null;
+  utm_medium?: string | null;
+  utm_campaign?: string | null;
+  utm_content?: string | null;
+  utm_term?: string | null;
+  s1?: string | null;
+  s2?: string | null;
+  s3?: string | null;
 }
 
 export interface FinancialData {

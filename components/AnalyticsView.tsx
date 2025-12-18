@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { FinancialData, BaseTransaction } from '../types';
+import { FinancialData, BaseTransaction, UserProfile } from '../types';
 import { GoogleGenAI } from "@google/genai";
 import { db, auth } from '../lib/firebase';
 import { collection, addDoc, query, orderBy, limit, onSnapshot, serverTimestamp, deleteDoc, doc, getDocs, setDoc, getDoc, increment } from 'firebase/firestore';
@@ -37,6 +37,7 @@ const AnalyticsView: React.FC<Props> = ({ monthData, totals }) => {
   const [history, setHistory] = useState<AIInsight[]>([]);
   const [copied, setCopied] = useState(false);
   const [aiFocus, setAiFocus] = useState<'geral' | 'custos' | 'crescimento' | 'crise'>('geral');
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   
   // Estados para Controle de Confirmação Customizado
   const [confirmConfig, setConfirmConfig] = useState<{
@@ -54,7 +55,13 @@ const AnalyticsView: React.FC<Props> = ({ monthData, totals }) => {
   // Controle de Créditos
   const [dailyUsage, setDailyUsage] = useState(0);
   const maxCredits = 3;
-  const isInfinite = auth.currentUser?.email === 'thor4tech@gmail.com';
+  
+  // Créditos infinitos para thor4tech, Cleitontadeu10 ou plano MASTER
+  const isInfinite = useMemo(() => {
+    const email = auth.currentUser?.email;
+    return email === 'thor4tech@gmail.com' || email === 'Cleitontadeu10@gmail.com' || profile?.planId === 'MASTER';
+  }, [auth.currentUser, profile]);
+  
   const remainingCredits = isInfinite ? Infinity : Math.max(0, maxCredits - dailyUsage);
 
   const monthId = useMemo(() => {
@@ -66,6 +73,11 @@ const AnalyticsView: React.FC<Props> = ({ monthData, totals }) => {
 
   useEffect(() => {
     if (!auth.currentUser) return;
+
+    // Carrega Perfil para checar plano
+    const unsubProfile = onSnapshot(doc(db, `users/${auth.currentUser.uid}/profile`, 'settings'), (snap) => {
+      if (snap.exists()) setProfile(snap.data() as UserProfile);
+    });
 
     const q = query(
       collection(db, `users/${auth.currentUser.uid}/data/${monthId}/ai_history`),
@@ -98,6 +110,7 @@ const AnalyticsView: React.FC<Props> = ({ monthData, totals }) => {
     return () => {
       unsubHistory();
       unsubUsage();
+      unsubProfile();
     };
   }, [monthId, todayStr]);
 
@@ -163,7 +176,7 @@ const AnalyticsView: React.FC<Props> = ({ monthData, totals }) => {
   const fetchAIAnalysis = async (focusOverride?: typeof aiFocus) => {
     if (!auth.currentUser) return;
     if (!isInfinite && dailyUsage >= maxCredits) {
-      alert("Limite diário atingido. Novos créditos disponíveis amanhã!");
+      alert("Limite diário atingido. Novos créditos disponíveis amanhã ou faça upgrade para o plano MASTER!");
       return;
     }
 
@@ -189,19 +202,19 @@ const AnalyticsView: React.FC<Props> = ({ monthData, totals }) => {
       - Auditoria de Alerta: ${alertsContext}
       - Liquidez Imediata: R$ ${(totals.availableCash || 0).toLocaleString('pt-BR')}
       
-      ESTRUTURA OBRIGATÓRIA (Markdown):
+      ESTRUTURA OBRIGATÓRIA (Markdown - OBRIGATORIAMENTE EM PORTUGUÊS):
       ### 🎯 RESUMO EXECUTIVO
       ### ⚠️ ANÁLISE DE RISCO
       ### 🚀 PLANO DE ATAQUE: ${focus.toUpperCase()}
       ### 💡 CONCLUSÃO ESTRATÉGICA
       
-      Regra: Use **negrito** para números. Tom executivo CFO.`;
+      Regra: O texto deve ser inteiramente em PORTUGUÊS (BR). Use **negrito** para números. Tom executivo CFO.`;
 
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: prompt,
         config: {
-          systemInstruction: "Você é o Master Intelligence PRO. Consultor financeiro de alto nível. Analise os dados e forneça caminhos para lucratividade."
+          systemInstruction: "Você é o Master Intelligence PRO. Consultor financeiro de alto nível especializado no mercado brasileiro. Sua análise deve ser técnica, direta e inteiramente em PORTUGUÊS (BR). Forneça caminhos estratégicos para lucratividade."
         }
       });
       
@@ -270,7 +283,7 @@ const AnalyticsView: React.FC<Props> = ({ monthData, totals }) => {
                   <h3 className="text-xl md:text-2xl font-black text-white tracking-tighter">Master Intelligence <span className="text-indigo-400">PRO 2.0</span></h3>
                   <div className="flex items-center gap-3 mt-1.5">
                     {isInfinite ? (
-                      <span className="flex items-center gap-1.5 text-[9px] font-black text-indigo-400 uppercase tracking-widest bg-indigo-400/10 px-3 py-1 rounded-full border border-indigo-400/20"><Unlock size={12}/> Unlimited Global Access</span>
+                      <span className="flex items-center gap-1.5 text-[9px] font-black text-indigo-400 uppercase tracking-widest bg-indigo-400/10 px-3 py-1 rounded-full border border-indigo-400/20"><Unlock size={12}/> Acesso Ilimitado ADM</span>
                     ) : (
                       <div className="flex items-center gap-4 bg-white/5 px-4 py-1.5 rounded-full border border-white/10">
                          <div className="flex gap-1.5">
@@ -355,8 +368,8 @@ const AnalyticsView: React.FC<Props> = ({ monthData, totals }) => {
                 {/* DASHBOARD DE APOIO À ANÁLISE */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                    <MiniStat label="Alcance Meta" value={incomePercent.toFixed(0) + '%'} color="text-indigo-600" />
-                   <MiniStat label="Health Margin" value={marginPercent.toFixed(0) + '%'} color={marginPercent > 0 ? "text-emerald-600" : "text-rose-600"} />
-                   <MiniStat label="Credit Risk" value={creditExposure.toFixed(0) + '%'} color={creditExposure > 60 ? "text-rose-600" : "text-slate-400"} />
+                   <MiniStat label="Margem Saúde" value={marginPercent.toFixed(0) + '%'} color={marginPercent > 0 ? "text-emerald-600" : "text-rose-600"} />
+                   <MiniStat label="Risco Crédito" value={creditExposure.toFixed(0) + '%'} color={creditExposure > 60 ? "text-rose-600" : "text-slate-400"} />
                    <MiniStat label="Fluxo Base" value={monthData.transactions.length.toString()} color="text-slate-900" />
                 </div>
               </div>
@@ -415,23 +428,6 @@ const AnalyticsView: React.FC<Props> = ({ monthData, totals }) => {
         )}
       </div>
 
-      {/* DASHBOARD EXECUTIVO LATERAL */}
-      <div className="hidden xl:grid grid-cols-3 gap-10">
-         <div className="bg-[#020617] p-12 rounded-[56px] text-white space-y-12">
-            <h4 className="text-[10px] font-black uppercase tracking-[0.4em] text-white/30 border-b border-white/10 pb-6 flex items-center gap-3"><PieChart size={18}/> Exec Analytics</h4>
-            <DashMetricPro label="RENTABILIDADE MENSAL" value={marginPercent.toFixed(1) + '%'} sub="Margem Líquida Real" color={marginPercent > 0 ? "text-emerald-400" : "text-rose-400"} icon={Activity} />
-            <DashMetricPro label="EXPOSIÇÃO BANCÁRIA" value={creditExposure.toFixed(1) + '%'} sub="Crédito vs Liquidez" color={creditExposure > 60 ? "text-rose-400" : "text-indigo-400"} icon={CreditCard} />
-         </div>
-         <div className="col-span-2 bg-indigo-50/30 border border-indigo-100 rounded-[56px] p-12 flex items-center justify-between">
-            <div className="max-w-md space-y-4">
-               <h4 className="text-[11px] font-black uppercase text-indigo-600 tracking-[0.3em]">Master Pro Vision</h4>
-               <p className="text-xl font-black text-slate-900 tracking-tighter">"A clareza financeira é o primeiro passo para o crescimento exponencial. Sua meta de R$ {currentMeta.toLocaleString('pt-BR')} exige {(currentMeta/22).toLocaleString('pt-BR', {style:'currency', currency:'BRL'})} de faturamento diário."</p>
-            </div>
-            <div className="p-8 bg-white rounded-full shadow-2xl text-indigo-600"><Sparkles size={48} /></div>
-         </div>
-      </div>
-
-      {/* MODAL DE CONFIRMAÇÃO CUSTOMIZADO */}
       <ConfirmModal 
         isOpen={confirmConfig.isOpen}
         title={confirmConfig.title}

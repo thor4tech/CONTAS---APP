@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { AssetMetadata, UserProfile } from '../types';
-import { X, Plus, Trash2, Save, Landmark, CreditCard, Settings, User as UserIcon, Building2, Mail, Lock, Target } from 'lucide-react';
+import { X, Plus, Trash2, Save, Landmark, CreditCard, Settings, User as UserIcon, Building2, Target, Crown, ShieldCheck, Zap, ExternalLink, Star } from 'lucide-react';
 
 interface Props {
   isOpen: boolean;
@@ -12,17 +12,18 @@ interface Props {
 }
 
 const SettingsModal: React.FC<Props> = ({ isOpen, onClose, userProfile, userEmail, onSaveProfile }) => {
-  const [activeTab, setActiveTab] = useState<'perfil' | 'ativos'>('perfil');
+  const [activeTab, setActiveTab] = useState<'perfil' | 'ativos' | 'planos'>('perfil');
   const [localName, setLocalName] = useState(userProfile.name);
   const [localCompany, setLocalCompany] = useState(userProfile.company);
-  // Adicionando meta de faturamento ao perfil
-  const [localMeta, setLocalMeta] = useState((userProfile as any).defaultMeta || 0);
+  const [localMeta, setLocalMeta] = useState(userProfile.defaultMeta || 0);
   const [localAssets, setLocalAssets] = useState<AssetMetadata[]>(userProfile.globalAssets || []);
 
   useEffect(() => {
     if (isOpen) {
       setLocalAssets(userProfile.globalAssets || []);
-      setLocalMeta((userProfile as any).defaultMeta || 0);
+      setLocalMeta(userProfile.defaultMeta || 0);
+      setLocalName(userProfile.name);
+      setLocalCompany(userProfile.company);
     }
   }, [isOpen, userProfile]);
 
@@ -59,19 +60,20 @@ const SettingsModal: React.FC<Props> = ({ isOpen, onClose, userProfile, userEmai
             </div>
             <div>
               <h3 className="text-xl md:text-2xl font-black text-slate-900 tracking-tighter">Painel de Controle</h3>
-              <p className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mt-1">Identidade e Estratégia</p>
+              <p className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mt-1">Identidade e Gestão</p>
             </div>
           </div>
           <button onClick={onClose} className="p-3 hover:bg-white rounded-full transition-all text-slate-400"><X size={28} /></button>
         </div>
 
         <div className="flex border-b border-slate-100 bg-white">
-           <button onClick={() => setActiveTab('perfil')} className={`flex-1 py-4 md:py-6 text-[9px] md:text-[11px] font-black uppercase tracking-[0.3em] border-b-4 transition-all ${activeTab === 'perfil' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400'}`}>Perfil & Metas</button>
-           <button onClick={() => setActiveTab('ativos')} className={`flex-1 py-4 md:py-6 text-[9px] md:text-[11px] font-black uppercase tracking-[0.3em] border-b-4 transition-all ${activeTab === 'ativos' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400'}`}>Ativos Fiscais</button>
+           <button onClick={() => setActiveTab('perfil')} className={`flex-1 py-4 md:py-6 text-[9px] md:text-[11px] font-black uppercase tracking-[0.3em] border-b-4 transition-all ${activeTab === 'perfil' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400'}`}>Perfil</button>
+           <button onClick={() => setActiveTab('ativos')} className={`flex-1 py-4 md:py-6 text-[9px] md:text-[11px] font-black uppercase tracking-[0.3em] border-b-4 transition-all ${activeTab === 'ativos' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400'}`}>Ativos</button>
+           <button onClick={() => setActiveTab('planos')} className={`flex-1 py-4 md:py-6 text-[9px] md:text-[11px] font-black uppercase tracking-[0.3em] border-b-4 transition-all ${activeTab === 'planos' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-slate-400'}`}>Assinatura</button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-8 md:p-12 space-y-10 bg-white">
-          {activeTab === 'perfil' ? (
+          {activeTab === 'perfil' && (
             <div className="space-y-8 animate-in slide-in-from-left-4 duration-500">
                <div className="space-y-4">
                   <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block px-2">Dados da Liderança</label>
@@ -84,23 +86,17 @@ const SettingsModal: React.FC<Props> = ({ isOpen, onClose, userProfile, userEmai
                     <input value={localCompany} onChange={e => setLocalCompany(e.target.value)} type="text" className="w-full bg-slate-50 border-2 border-slate-100 rounded-[24px] pl-16 pr-8 py-4 focus:border-indigo-300 outline-none font-bold text-slate-800" placeholder="Empresa" />
                   </div>
                </div>
-
                <div className="space-y-4">
-                  <label className="text-[10px] font-black text-indigo-500 uppercase tracking-widest block px-2 flex items-center gap-2"><Target size={14}/> Meta de Faturamento do Mês (R$)</label>
+                  <label className="text-[10px] font-black text-indigo-500 uppercase tracking-widest block px-2 flex items-center gap-2"><Target size={14}/> Meta Faturamento (R$)</label>
                   <div className="relative">
                     <span className="absolute left-6 top-1/2 -translate-y-1/2 text-indigo-300 font-mono font-black">R$</span>
-                    <input 
-                      value={localMeta || ''} 
-                      onChange={e => setLocalMeta(parseFloat(e.target.value) || 0)} 
-                      type="number" 
-                      className="w-full bg-indigo-50 border-2 border-indigo-100 rounded-[24px] pl-16 pr-8 py-5 focus:border-indigo-500 outline-none font-black text-indigo-700 text-xl font-mono tracking-tighter" 
-                      placeholder="Ex: 30000" 
-                    />
+                    <input value={localMeta || ''} onChange={e => setLocalMeta(parseFloat(e.target.value) || 0)} type="number" className="w-full bg-indigo-50 border-2 border-indigo-100 rounded-[24px] pl-16 pr-8 py-5 focus:border-indigo-500 outline-none font-black text-indigo-700 text-xl font-mono tracking-tighter" placeholder="Ex: 30000" />
                   </div>
-                  <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest px-2">Essa meta será usada pela IA para calcular o ROI e Projeções.</p>
                </div>
             </div>
-          ) : (
+          )}
+
+          {activeTab === 'ativos' && (
             <div className="space-y-10 animate-in slide-in-from-right-4 duration-500">
               <section className="space-y-6">
                 <div className="flex items-center justify-between px-2">
@@ -116,7 +112,6 @@ const SettingsModal: React.FC<Props> = ({ isOpen, onClose, userProfile, userEmai
                   ))}
                 </div>
               </section>
-
               <section className="space-y-6">
                 <div className="flex items-center justify-between px-2">
                   <h4 className="text-[10px] font-black text-slate-900 uppercase tracking-[0.3em] flex items-center gap-2"><CreditCard size={18} className="text-rose-500" /> Cartões</h4>
@@ -131,6 +126,65 @@ const SettingsModal: React.FC<Props> = ({ isOpen, onClose, userProfile, userEmai
                   ))}
                 </div>
               </section>
+            </div>
+          )}
+
+          {activeTab === 'planos' && (
+            <div className="space-y-8 animate-in zoom-in-95 duration-500">
+               <div className="p-8 bg-slate-900 rounded-[32px] text-white flex justify-between items-center relative overflow-hidden">
+                  <div className="relative z-10">
+                     <span className="text-[9px] font-black text-white/40 uppercase tracking-widest block mb-2">Plano Atual</span>
+                     <div className="flex items-center gap-3">
+                        {userProfile.planId === 'MASTER' ? <Crown className="text-indigo-400" /> : <ShieldCheck className="text-emerald-400" />}
+                        <h4 className="text-2xl font-black tracking-tighter uppercase">{userProfile.planId}</h4>
+                     </div>
+                     <span className={`text-[10px] font-black uppercase tracking-widest mt-2 block ${userProfile.subscriptionStatus === 'ACTIVE' ? 'text-emerald-400' : 'text-amber-400'}`}>Status: {userProfile.subscriptionStatus === 'TRIAL' ? 'Período de Teste' : userProfile.subscriptionStatus}</span>
+                  </div>
+                  <div className="p-4 bg-white/10 rounded-2xl backdrop-blur-md relative z-10">
+                     <Zap size={32} className="text-indigo-400" />
+                  </div>
+               </div>
+
+               <div className="grid grid-cols-1 gap-4">
+                  <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">Opções de Upgrade</h4>
+                  
+                  {/* ESSENCIAL */}
+                  <a href="https://pay.kiwify.com.br/CRTkeeH" target="_blank" className="flex items-center justify-between p-6 bg-slate-50 rounded-[28px] border-2 border-transparent hover:border-indigo-600 transition-all group">
+                     <div>
+                        <span className="text-lg font-black text-slate-900 uppercase">Essencial</span>
+                        <p className="text-[9px] font-bold text-slate-400 uppercase mt-1">Sair do caos financeiro</p>
+                     </div>
+                     <div className="text-right">
+                        <span className="text-indigo-600 font-black font-mono block">R$ 39,90</span>
+                        <ExternalLink size={14} className="ml-auto text-slate-300 mt-1" />
+                     </div>
+                  </a>
+
+                  {/* PRO */}
+                  <a href="https://pay.kiwify.com.br/56PjP10" target="_blank" className="flex items-center justify-between p-6 bg-slate-50 rounded-[28px] border-2 border-indigo-600 transition-all group relative">
+                     <div className="absolute top-0 right-10 -translate-y-1/2 bg-indigo-600 text-white px-3 py-1 rounded-full text-[8px] font-black tracking-widest uppercase flex items-center gap-1"><Star size={10} fill="white"/> Destaque</div>
+                     <div>
+                        <span className="text-lg font-black text-slate-900 uppercase">Pro Estratégico</span>
+                        <p className="text-[9px] font-bold text-indigo-400 uppercase mt-1">IA + Auditoria + Agenda</p>
+                     </div>
+                     <div className="text-right">
+                        <span className="text-indigo-600 font-black font-mono block">R$ 69,90</span>
+                        <ExternalLink size={14} className="ml-auto text-slate-300 mt-1" />
+                     </div>
+                  </a>
+
+                  {/* MASTER */}
+                  <a href="https://pay.kiwify.com.br/Lkgu7yS" target="_blank" className="flex items-center justify-between p-6 bg-slate-50 rounded-[28px] border-2 border-transparent hover:border-slate-900 transition-all group">
+                     <div>
+                        <span className="text-lg font-black text-slate-900 uppercase">Master Intelligence</span>
+                        <p className="text-[9px] font-bold text-slate-400 uppercase mt-1">IA Ilimitada + Multi-empresa</p>
+                     </div>
+                     <div className="text-right">
+                        <span className="text-slate-900 font-black font-mono block">R$ 129,90</span>
+                        <ExternalLink size={14} className="ml-auto text-slate-300 mt-1" />
+                     </div>
+                  </a>
+               </div>
             </div>
           )}
         </div>
