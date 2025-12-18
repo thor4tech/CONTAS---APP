@@ -67,7 +67,7 @@ export interface FinancialData {
   investimento: number;
   retorno: number;
   balances: Record<string, number>;
-  cardDetails?: Record<string, { dueDate: string; situation: Situation }>;
+  cardDetails?: Record<string, { dueDate?: string; situation?: Situation }>;
 }
 
 export interface AppState {
