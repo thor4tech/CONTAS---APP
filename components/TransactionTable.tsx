@@ -64,7 +64,7 @@ const TransactionTable: React.FC<Props> = ({ title, color, data, categories, par
           </div>
         </div>
         <button onClick={onAddNew} className="w-12 h-12 md:w-14 md:h-14 bg-white text-[#020617] rounded-[18px] md:rounded-3xl shadow-4xl hover:scale-110 active:scale-95 transition-all flex items-center justify-center relative z-10 group">
-          <Plus size={28} md:size={32} strokeWidth={3} className="group-hover:rotate-90 transition-transform" />
+          <Plus strokeWidth={3} className="w-7 h-7 md:w-8 md:h-8 group-hover:rotate-90 transition-transform" />
         </button>
       </div>
 
