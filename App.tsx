@@ -18,9 +18,9 @@ import Login from './components/Login';
 import { 
   TrendingUp, Wallet, ChevronLeft, ChevronRight, LayoutDashboard, 
   Calendar, List, Plus, Palette, Users, Activity, LogOut, 
-  CreditCard, Landmark, ArrowDownCircle, Trash2,
+  CreditCard, Landmark, ArrowDownCircle, Trash2, Zap,
   Settings, ShieldCheck, CreditCard as CardIcon, CheckCircle2,
-  BarChart3, Clock, PiggyBank, Copy, ArrowUpRight, Bell, AlertTriangle, X
+  BarChart3, Clock, PiggyBank, Copy, ArrowUpRight, Bell, AlertTriangle, X, Unlock
 } from 'lucide-react';
 import { parseISO, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -31,10 +31,12 @@ const App: React.FC = () => {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [isAlertsOpen, setIsAlertsOpen] = useState(false);
   const [isConfirmDupOpen, setIsConfirmDupOpen] = useState(false);
+  const [dailyUsage, setDailyUsage] = useState(0);
   
   const now = useMemo(() => new Date(), []);
   const initialMonth = MONTHS[now.getMonth()];
   const initialYear = now.getFullYear();
+  const todayStr = format(now, 'yyyy-MM-dd');
 
   const [appState, setAppState] = useState<AppState>({
     currentMonth: initialMonth,
@@ -83,8 +85,7 @@ const App: React.FC = () => {
           reserva: d.data().reserva || 0,
         } as FinancialData));
         setAppState(prev => ({ ...prev, data: dataArr }));
-      }, 
-      (err) => console.warn("Firestore Data Restricted:", err.message)
+      }
     );
 
     const unsubProfile = onSnapshot(doc(db, `users/${user.uid}/profile`, 'settings'), 
@@ -100,31 +101,38 @@ const App: React.FC = () => {
             }
           }));
         }
-      },
-      (err) => console.warn("Firestore Profile Restricted:", err.message)
+      }
     );
 
     const unsubCategories = onSnapshot(query(collection(db, `users/${user.uid}/categories`)), 
       (snap) => {
         if (!snap.empty) setAppState(prev => ({ ...prev, categories: snap.docs.map(d => d.data() as Category) }));
-      },
-      (err) => console.warn("Firestore Categories Restricted:", err.message)
+      }
     );
 
     const unsubPartners = onSnapshot(query(collection(db, `users/${user.uid}/partners`)), 
       (snap) => {
         setAppState(prev => ({ ...prev, partners: snap.docs.map(d => d.data() as Partner) }));
-      },
-      (err) => console.warn("Firestore Partners Restricted:", err.message)
+      }
     );
+
+    const usageRef = doc(db, `users/${user.uid}/usage`, todayStr);
+    const unsubUsage = onSnapshot(usageRef, (docSnap) => {
+      if (docSnap.exists()) {
+        setDailyUsage(docSnap.data().count || 0);
+      } else {
+        setDailyUsage(0);
+      }
+    });
 
     return () => {
       unsubData();
       unsubProfile();
       unsubCategories();
       unsubPartners();
+      unsubUsage();
     };
-  }, [user]);
+  }, [user, todayStr]);
 
   const currentMonthId = useMemo(() => {
     const mIdx = MONTHS.indexOf(appState.currentMonth) + 1;
@@ -323,6 +331,9 @@ const App: React.FC = () => {
     await setDoc(doc(db, `users/${user.uid}/profile`, 'settings'), profile, { merge: true });
   };
 
+  const isInfinite = user?.email === 'thor4tech@gmail.com';
+  const remainingCredits = isInfinite ? Infinity : Math.max(0, 3 - dailyUsage);
+
   if (authLoading) return <div className="h-screen bg-slate-950 flex items-center justify-center"><Activity className="animate-spin text-indigo-500" /></div>;
   if (!user) return <Login onLogin={() => {}} />;
 
@@ -350,6 +361,25 @@ const App: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2 md:gap-4 shrink-0">
+            {/* Sistema de Créditos Superior */}
+            <div className="hidden md:flex items-center gap-4 bg-slate-900 px-6 py-3 rounded-2xl border border-white/5 shadow-2xl">
+               <div className="flex flex-col items-end">
+                  <span className="text-[7px] font-black text-white/40 uppercase tracking-widest">IA Credits</span>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    {isInfinite ? (
+                      <span className="flex items-center gap-1 text-[9px] font-black text-indigo-400 uppercase"><Unlock size={10}/> Master Access</span>
+                    ) : (
+                      <div className="flex gap-1">
+                        {[1, 2, 3].map(i => (
+                          <div key={i} className={`w-1.5 h-1.5 rounded-full ${i <= remainingCredits ? 'bg-emerald-500 shadow-[0_0_5px_rgba(16,185,129,0.8)]' : 'bg-white/10'}`}></div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+               </div>
+               <div className="p-2 bg-white/10 rounded-lg text-indigo-400"><Zap size={14} fill="currentColor" /></div>
+            </div>
+
             <div className="relative">
               <button 
                 onClick={() => setIsAlertsOpen(!isAlertsOpen)} 
@@ -470,7 +500,7 @@ const App: React.FC = () => {
                     <div className="flex justify-between items-center border-b border-slate-100 pb-6 md:pb-8"><h4 className="text-[10px] md:text-[11px] font-black text-slate-900 uppercase tracking-[0.4em] flex items-center gap-3"><Landmark size={18} className="text-indigo-500" /> Bancos & Carteiras</h4></div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
                       {currentMonthData.accounts.map(acc => ( <BalanceItem key={acc.id} item={acc} onUpdateBalance={v => updateBalanceInMonth(acc.id, v)} /> ))}
-                      {currentMonthData.accounts.length === 0 && <EmptyAsset message="Configure seus Bancos" icon={Landmark} />}
+                      {currentMonthData.accounts.length === 0 && <EmptyAsset message="Configure seus Bancos" icon={Landmark} onClick={() => setIsSettingsOpen(true)} />}
                     </div>
                   </div>
                </div>
@@ -486,7 +516,7 @@ const App: React.FC = () => {
                         onUpdateStatus={s => updateCardDetail(card.id, 'situation', s)}
                       /> 
                     ))}
-                    {currentMonthData.creditCards.length === 0 && <EmptyAsset message="Configure seus Cartões" icon={CreditCard} />}
+                    {currentMonthData.creditCards.length === 0 && <EmptyAsset message="Configure seus Cartões" icon={CreditCard} onClick={() => setIsSettingsOpen(true)} />}
                   </div>
                </div>
             </div>
@@ -572,11 +602,15 @@ const SimpleCardItem: React.FC<{ item: CreditCardItem; onUpdateBalance: (v: numb
   );
 };
 
-const EmptyAsset: React.FC<{ message: string; icon: any }> = ({ message, icon: Icon }) => (
-  <div className="py-8 md:py-10 border-2 border-dashed border-slate-200 rounded-[28px] md:rounded-[32px] flex flex-col items-center justify-center opacity-40">
-    <Icon size={28} className="text-slate-300 mb-3" />
-    <span className="text-[9px] font-black uppercase tracking-widest">{message}</span>
-  </div>
+const EmptyAsset: React.FC<{ message: string; icon: any; onClick?: () => void }> = ({ message, icon: Icon, onClick }) => (
+  <button 
+    onClick={onClick}
+    className="w-full py-8 md:py-10 border-2 border-dashed border-slate-200 rounded-[28px] md:rounded-[32px] flex flex-col items-center justify-center opacity-40 hover:opacity-100 hover:bg-white hover:border-indigo-400 hover:shadow-2xl transition-all group"
+  >
+    <Icon size={28} className="text-slate-300 mb-3 group-hover:text-indigo-500 transition-colors" />
+    <span className="text-[9px] font-black uppercase tracking-widest text-slate-500 group-hover:text-indigo-600">{message}</span>
+    <p className="text-[7px] font-bold text-slate-300 uppercase mt-2 group-hover:text-indigo-400">Clique para configurar</p>
+  </button>
 );
 
 export default App;

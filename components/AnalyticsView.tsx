@@ -6,6 +6,7 @@ import { db, auth } from '../lib/firebase';
 import { collection, addDoc, query, orderBy, limit, onSnapshot, serverTimestamp, deleteDoc, doc, getDocs, setDoc, getDoc, increment } from 'firebase/firestore';
 import { format } from 'date-fns';
 import { MONTHS } from '../constants';
+import ConfirmModal from './ConfirmModal';
 import { 
   Sparkles, Activity, TrendingUp, TrendingDown, Target, 
   BarChart3, PieChart, Info, Bot, Zap, ArrowRight, 
@@ -37,13 +38,25 @@ const AnalyticsView: React.FC<Props> = ({ monthData, totals }) => {
   const [copied, setCopied] = useState(false);
   const [aiFocus, setAiFocus] = useState<'geral' | 'custos' | 'crescimento' | 'crise'>('geral');
   
+  // Estados para Controle de Confirmação Customizado
+  const [confirmConfig, setConfirmConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
+
   // Controle de Créditos
   const [dailyUsage, setDailyUsage] = useState(0);
   const maxCredits = 3;
   const isInfinite = auth.currentUser?.email === 'thor4tech@gmail.com';
   const remainingCredits = isInfinite ? Infinity : Math.max(0, maxCredits - dailyUsage);
 
-  // Sincronização exata com o ID do mês no Firestore
   const monthId = useMemo(() => {
     const mIdx = MONTHS.indexOf(monthData.month) + 1;
     return `${monthData.year}-${mIdx.toString().padStart(2, '0')}`;
@@ -67,7 +80,6 @@ const AnalyticsView: React.FC<Props> = ({ monthData, totals }) => {
       })) as AIInsight[];
       setHistory(historyData);
       
-      // Se tiver histórico e nada selecionado, mostra o último
       if (historyData.length > 0 && !analysis && !isActivated) {
         setAnalysis(historyData[0].text);
         setIsActivated(true);
@@ -89,50 +101,55 @@ const AnalyticsView: React.FC<Props> = ({ monthData, totals }) => {
     };
   }, [monthId, todayStr]);
 
-  const handleDeleteHistoryItem = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation(); // Impede que o clique no botão ative o card
+  const executeDeleteHistoryItem = async (id: string) => {
     if (!auth.currentUser) return;
-    
-    const confirmDelete = window.confirm("🗑️ EXCLUIR RELATÓRIO: Tem certeza que deseja apagar permanentemente esta análise estratégica do seu histórico?");
-    
-    if (confirmDelete) {
-      try {
-        const docRef = doc(db, `users/${auth.currentUser.uid}/data/${monthId}/ai_history`, id);
-        await deleteDoc(docRef);
-        
-        // Se a análise excluída for a que está sendo exibida, limpa a tela
-        if (analysis === history.find(h => h.id === id)?.text) {
-          setAnalysis(null);
-          setIsActivated(false);
-        }
-      } catch (err) {
-        console.error("Erro ao excluir:", err);
-        alert("Falha na exclusão. Tente novamente.");
+    try {
+      const docRef = doc(db, `users/${auth.currentUser.uid}/data/${monthId}/ai_history`, id);
+      await deleteDoc(docRef);
+      if (analysis === history.find(h => h.id === id)?.text) {
+        setAnalysis(null);
+        setIsActivated(false);
       }
+    } catch (err) {
+      console.error("Erro ao excluir:", err);
+    } finally {
+      setConfirmConfig(prev => ({ ...prev, isOpen: false }));
     }
   };
 
-  const handleClearAllHistory = async () => {
+  const handleDeleteHistoryItem = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setConfirmConfig({
+      isOpen: true,
+      title: "Excluir Relatório?",
+      message: "Deseja apagar permanentemente esta análise estratégica? Essa ação não pode ser desfeita e removerá o insight do seu histórico.",
+      onConfirm: () => executeDeleteHistoryItem(id)
+    });
+  };
+
+  const executeClearAllHistory = async () => {
     if (!auth.currentUser) return;
-    
-    const confirmClear = window.confirm("🚨 ALERTA DE SEGURANÇA: Você está prestes a apagar TODOS os relatórios de IA deste mês. Esta ação é irreversível e apagará toda a inteligência armazenada. Prosseguir?");
-    
-    if (confirmClear) {
-      try {
-        const q = query(collection(db, `users/${auth.currentUser.uid}/data/${monthId}/ai_history`));
-        const snapshot = await getDocs(q);
-        
-        const deletePromises = snapshot.docs.map(d => deleteDoc(d.ref));
-        await Promise.all(deletePromises);
-        
-        setAnalysis(null);
-        setIsActivated(false);
-        alert("Estratégias limpas com sucesso.");
-      } catch (err) {
-        console.error("Erro ao limpar histórico:", err);
-        alert("Erro ao tentar limpar o histórico de dados.");
-      }
+    try {
+      const q = query(collection(db, `users/${auth.currentUser.uid}/data/${monthId}/ai_history`));
+      const snapshot = await getDocs(q);
+      const deletePromises = snapshot.docs.map(d => deleteDoc(d.ref));
+      await Promise.all(deletePromises);
+      setAnalysis(null);
+      setIsActivated(false);
+    } catch (err) {
+      console.error("Erro ao limpar histórico:", err);
+    } finally {
+      setConfirmConfig(prev => ({ ...prev, isOpen: false }));
     }
+  };
+
+  const handleClearAllHistory = () => {
+    setConfirmConfig({
+      isOpen: true,
+      title: "Zerar Histórico Estratégico?",
+      message: "ALERTA: Você está prestes a apagar TODOS os relatórios de IA deste mês. Toda a inteligência e auditorias geradas serão removidas definitivamente.",
+      onConfirm: executeClearAllHistory
+    });
   };
 
   const copyToClipboard = () => {
@@ -413,6 +430,18 @@ const AnalyticsView: React.FC<Props> = ({ monthData, totals }) => {
             <div className="p-8 bg-white rounded-full shadow-2xl text-indigo-600"><Sparkles size={48} /></div>
          </div>
       </div>
+
+      {/* MODAL DE CONFIRMAÇÃO CUSTOMIZADO */}
+      <ConfirmModal 
+        isOpen={confirmConfig.isOpen}
+        title={confirmConfig.title}
+        message={confirmConfig.message}
+        onConfirm={confirmConfig.onConfirm}
+        onCancel={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+        confirmLabel="Confirmar Exclusão"
+        cancelLabel="Manter Relatório"
+        variant="danger"
+      />
     </div>
   );
 };
