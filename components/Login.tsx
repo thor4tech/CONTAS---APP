@@ -35,63 +35,64 @@ const Login: React.FC<Props> = ({ onLogin, onBackToLanding }) => {
   };
 
   return (
-    <div className="min-h-screen bg-[#020617] flex items-center justify-center p-6 relative overflow-hidden">
+    <div className="min-h-screen bg-[#020617] flex flex-col items-center justify-center p-4 md:p-6 relative overflow-hidden">
       {/* Background decorativo */}
       <div className="absolute top-0 right-0 w-[1000px] h-[1000px] bg-indigo-600/10 rounded-full -mr-[400px] -mt-[400px] blur-[150px] pointer-events-none"></div>
       <div className="absolute bottom-0 left-0 w-[800px] h-[800px] bg-emerald-600/5 rounded-full -ml-[300px] -mb-[300px] blur-[150px] pointer-events-none"></div>
-      <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-[0.03] pointer-events-none"></div>
 
-      {/* Botão de Voltar para Landing Page */}
-      <button 
-        onClick={onBackToLanding}
-        className="absolute top-6 left-6 md:top-10 md:left-10 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 hover:text-white transition-all group z-50"
-      >
-        <div className="p-2 bg-white/5 rounded-lg border border-white/10 group-hover:bg-indigo-600 transition-all">
-          <ChevronLeft size={16} />
-        </div>
-        <span>Voltar para o início</span>
-      </button>
-
-      <div className="w-full max-w-md relative z-10">
-        <div className="text-center mb-10">
-          <div className="inline-flex p-5 bg-gradient-to-br from-indigo-600 to-indigo-950 rounded-[32px] text-white shadow-[0_20px_50px_rgba(79,70,229,0.3)] mb-6 border border-white/10 group">
-            <Activity size={36} className="text-emerald-300 group-hover:scale-110 transition-transform" />
+      {/* Botão de Voltar - Ajustado para mobile */}
+      <div className="absolute top-4 md:top-10 left-4 md:left-10 z-50">
+        <button 
+          onClick={onBackToLanding}
+          className="flex items-center gap-2 text-[10px] md:text-[11px] font-black uppercase tracking-[0.3em] text-slate-400 hover:text-white transition-all group"
+        >
+          <div className="p-2 bg-white/5 rounded-lg border border-white/10 group-hover:bg-indigo-600 transition-all">
+            <ChevronLeft size={16} />
           </div>
-          <h1 className="text-4xl font-black text-white tracking-tighter mb-2 uppercase">Cria Gestão <span className="text-indigo-400">Pro</span></h1>
-          <p className="text-[10px] font-black text-indigo-300/40 uppercase tracking-[0.5em]">Master Intelligence Strategic</p>
+          <span className="hidden xs:inline">Voltar ao início</span>
+        </button>
+      </div>
+
+      <div className="w-full max-w-md relative z-10 flex flex-col items-center">
+        <div className="text-center mb-8 md:mb-10">
+          <div className="inline-flex p-4 md:p-5 bg-gradient-to-br from-indigo-600 to-indigo-950 rounded-[24px] md:rounded-[32px] text-white shadow-[0_20px_50px_rgba(79,70,229,0.3)] mb-4 md:mb-6 border border-white/10 group">
+            <Activity size={32} className="md:size-[36px] text-emerald-300 group-hover:scale-110 transition-transform" />
+          </div>
+          <h1 className="text-3xl md:text-4xl font-black text-white tracking-tighter mb-1 md:mb-2 uppercase leading-none">Cria Gestão <span className="text-indigo-400">Pro</span></h1>
+          <p className="text-[9px] md:text-[10px] font-black text-indigo-300/40 uppercase tracking-[0.5em]">Master Intelligence Strategic</p>
         </div>
 
-        <div className="bg-white/95 backdrop-blur-2xl rounded-[48px] p-10 md:p-12 shadow-[0_50px_100px_rgba(0,0,0,0.5)] border border-white/20">
-          <div className="mb-10 text-center md:text-left">
-            <h2 className="text-2xl font-black text-slate-900 tracking-tight mb-2 flex items-center justify-center md:justify-start gap-2">
-              {isRegistering ? 'Teste Grátis 7 Dias' : 'Painel Estratégico'} <Sparkles size={20} className="text-indigo-500" />
+        <div className="bg-white/95 backdrop-blur-2xl rounded-[32px] md:rounded-[48px] p-8 md:p-12 shadow-[0_50px_100px_rgba(0,0,0,0.5)] border border-white/20 w-full">
+          <div className="mb-8 text-center md:text-left">
+            <h2 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight mb-2 flex items-center justify-center md:justify-start gap-2">
+              {isRegistering ? 'Teste Grátis 7 Dias' : 'Painel Estratégico'} <Sparkles size={20} className="text-indigo-500 shrink-0" />
             </h2>
-            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">
+            <p className="text-[10px] md:text-[11px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">
               {isRegistering ? 'Inicie sua jornada de controle absoluto' : 'Acesse seu centro de comando financeiro'}
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4 md:space-y-6">
+            <div className="space-y-3 md:space-y-4">
               <div className="relative group">
-                <Mail className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-indigo-500 transition-colors" size={20} />
+                <Mail className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-indigo-500 transition-colors" size={18} />
                 <input 
                   type="email" 
                   required
-                  placeholder="Seu email cadastrado"
-                  className="w-full bg-slate-50 border-2 border-slate-100 rounded-[28px] pl-16 pr-8 py-5 focus:ring-4 focus:ring-indigo-100 focus:bg-white focus:border-indigo-200 transition-all outline-none font-bold text-slate-700 placeholder:text-slate-300"
+                  placeholder="Seu email"
+                  className="w-full bg-slate-50 border-2 border-slate-100 rounded-[24px] md:rounded-[28px] pl-16 pr-8 py-4 md:py-5 focus:ring-4 focus:ring-indigo-100 focus:bg-white focus:border-indigo-200 transition-all outline-none font-bold text-slate-700 placeholder:text-slate-300 text-sm md:text-base"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                 />
               </div>
 
               <div className="relative group">
-                <Lock className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-indigo-500 transition-colors" size={20} />
+                <Lock className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-indigo-500 transition-colors" size={18} />
                 <input 
                   type="password" 
                   required
-                  placeholder="Sua senha secreta"
-                  className="w-full bg-slate-50 border-2 border-slate-100 rounded-[28px] pl-16 pr-8 py-5 focus:ring-4 focus:ring-indigo-100 focus:bg-white focus:border-indigo-200 transition-all outline-none font-bold text-slate-700 placeholder:text-slate-300"
+                  placeholder="Sua senha"
+                  className="w-full bg-slate-50 border-2 border-slate-100 rounded-[24px] md:rounded-[28px] pl-16 pr-8 py-4 md:py-5 focus:ring-4 focus:ring-indigo-100 focus:bg-white focus:border-indigo-200 transition-all outline-none font-bold text-slate-700 placeholder:text-slate-300 text-sm md:text-base"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                 />
@@ -99,7 +100,7 @@ const Login: React.FC<Props> = ({ onLogin, onBackToLanding }) => {
             </div>
 
             {error && (
-              <div className="p-4 bg-rose-50 text-rose-600 rounded-2xl text-[10px] font-black uppercase tracking-widest text-center border border-rose-100">
+              <div className="p-3 bg-rose-50 text-rose-600 rounded-xl text-[9px] font-black uppercase tracking-widest text-center border border-rose-100">
                 {error}
               </div>
             )}
@@ -107,25 +108,25 @@ const Login: React.FC<Props> = ({ onLogin, onBackToLanding }) => {
             <button 
               type="submit" 
               disabled={loading}
-              className="w-full py-6 bg-indigo-600 hover:bg-indigo-700 text-white rounded-[28px] text-[13px] font-black uppercase tracking-widest shadow-[0_20px_40px_rgba(79,70,229,0.3)] hover:shadow-[0_25px_50px_rgba(79,70,229,0.4)] transition-all flex items-center justify-center gap-4 group active:scale-95"
+              className="w-full py-4 md:py-6 bg-indigo-600 hover:bg-indigo-700 text-white rounded-[24px] md:rounded-[28px] text-[11px] md:text-[13px] font-black uppercase tracking-widest shadow-xl transition-all flex items-center justify-center gap-3 md:gap-4 group active:scale-95"
             >
               {loading ? (
                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
               ) : (
                 <>
-                  {isRegistering ? 'Ativar Teste Grátis' : 'Entrar no Sistema'}
-                  <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
+                  {isRegistering ? 'Ativar Teste' : 'Entrar'}
+                  <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
                 </>
               )}
             </button>
           </form>
 
-          <div className="mt-8 pt-8 border-t border-slate-100 text-center">
+          <div className="mt-6 md:mt-8 pt-6 md:pt-8 border-t border-slate-100 text-center">
             <button 
               onClick={() => setIsRegistering(!isRegistering)}
-              className="text-[10px] font-black text-slate-400 hover:text-indigo-600 transition-colors uppercase tracking-widest"
+              className="text-[9px] md:text-[10px] font-black text-slate-400 hover:text-indigo-600 transition-colors uppercase tracking-widest"
             >
-              {isRegistering ? 'Já possui acesso? Clique aqui' : 'Novo por aqui? Comece o teste grátis'}
+              {isRegistering ? 'Já possui acesso? Entrar' : 'Novo aqui? Testar grátis'}
             </button>
           </div>
         </div>

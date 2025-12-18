@@ -3,7 +3,7 @@
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>Cria Gestão Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -12,20 +12,31 @@
         font-family: 'Inter', sans-serif;
         overflow-x: hidden;
         width: 100%;
+        margin: 0;
+        padding: 0;
         position: relative;
         touch-action: manipulation;
+        -webkit-overflow-scrolling: touch;
       }
       #root {
         width: 100%;
+        min-height: 100vh;
         overflow-x: hidden;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
       }
-      /* Esconder scrollbar mas manter funcionalidade */
       .no-scrollbar::-webkit-scrollbar { display: none; }
       .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       
-      /* Ajuste fino para inputs mobile */
       input, select, textarea {
-        font-size: 16px !important; /* Evita zoom automático no iOS */
+        font-size: 16px !important;
+      }
+
+      /* Ajustes extras mobile */
+      @media (max-width: 640px) {
+        .xs\:inline { display: inline; }
+        .xs\:hidden { display: none; }
       }
     </style>
   <script type="importmap">

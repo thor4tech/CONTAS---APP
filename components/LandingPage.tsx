@@ -7,7 +7,6 @@ import {
   AlertTriangle, PieChart, Star, TrendingUp, TrendingDown, 
   DollarSign, Shield, Rocket, ChevronRight
 } from 'lucide-react';
-import { APP_URLS } from '../lib/subscription';
 
 interface LandingPageProps {
   onEntrar: () => void;
@@ -60,7 +59,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEntrar, onTesteGratis }) =>
             <span className="text-indigo-600">É comando estratégico.</span>
           </h2>
           <p className="text-lg md:text-2xl font-medium text-slate-500 max-w-3xl mx-auto leading-relaxed mb-12 animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-200">
-            Acesse <span className="text-slate-900 font-bold uppercase">gestaocria.pro</span> e descubra por que o controle absoluto é o caminho mais rápido para a sua lucratividade.
+            Acesse <span className="text-slate-900 font-bold uppercase">gestaocria.pro</span> e descubra por que o controle absoluto é the caminho mais rápido para a sua lucratividade.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-in fade-in slide-in-from-bottom-10 duration-1000 delay-500">
             <button 
