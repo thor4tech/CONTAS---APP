@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { auth, db } from './lib/firebase';
 import { onAuthStateChanged, type User } from 'firebase/auth';
 import { doc, onSnapshot, getDoc, setDoc } from 'firebase/firestore';
-import { Activity, ShieldAlert, CheckCircle2, Star, ShieldCheck, Zap } from 'lucide-react';
+import { Activity, ShieldAlert, CheckCircle2, Star, ShieldCheck, Zap, Sparkles } from 'lucide-react';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import LandingPage from './components/LandingPage';
@@ -17,6 +17,7 @@ const App: React.FC = () => {
   const [profileLoading, setProfileLoading] = useState(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [currentView, setCurrentView] = useState<'landing' | 'login' | 'dashboard'>('landing');
+  const [isExiting, setIsExiting] = useState(false);
 
   // Captura automática de UTMs da URL
   const getMarketingParams = () => {
@@ -39,7 +40,6 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
-      setUser(u);
       if (u) {
         setProfileLoading(true);
         const profileRef = doc(db, `users/${u.uid}/profile`, 'settings');
@@ -48,7 +48,6 @@ const App: React.FC = () => {
           
           if (!docSnap.exists()) {
             const now = new Date();
-            // Mantém a regra padrão de 7 dias para novos registros
             const trialEnd = addDays(now, 7);
             const mkt = getMarketingParams();
 
@@ -74,14 +73,17 @@ const App: React.FC = () => {
             if (snap.exists()) {
               setProfile(snap.data() as UserProfile);
             }
-            setProfileLoading(false);
+            // Pequeno delay para garantir que os dados renderizem antes de remover o loading
+            setTimeout(() => setProfileLoading(false), 300);
           });
         } catch (err) {
           console.error("Erro ao carregar perfil:", err);
           setProfileLoading(false);
         }
+        setUser(u);
         setCurrentView('dashboard');
       } else {
+        setUser(null);
         setProfile(null);
         setProfileLoading(false);
         if (currentView === 'dashboard') setCurrentView('landing');
@@ -92,39 +94,66 @@ const App: React.FC = () => {
     return () => unsubscribe();
   }, [currentView]);
 
-  if (authLoading || (user && profileLoading && !profile)) {
+  // Função para mudar de tela com transição suave
+  const navigateTo = (view: 'landing' | 'login' | 'dashboard') => {
+    setIsExiting(true);
+    setTimeout(() => {
+      setCurrentView(view);
+      setIsExiting(false);
+    }, 400);
+  };
+
+  // Tela de Loading Estratégica (Preenche tudo com estética premium)
+  if (authLoading || (user && profileLoading)) {
     return (
-      <div className="h-screen bg-[#020617] flex items-center justify-center">
-        <Activity size={48} className="text-indigo-500 animate-spin" />
+      <div className="fixed inset-0 bg-[#020617] z-[999] flex flex-col items-center justify-center overflow-hidden">
+        <div className="absolute top-0 left-0 w-full h-full pointer-events-none opacity-20">
+          <div className="absolute top-[-10%] right-[-10%] w-[600px] h-[600px] bg-indigo-600 rounded-full blur-[150px] animate-pulse"></div>
+          <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-emerald-600 rounded-full blur-[120px]"></div>
+        </div>
+        
+        <div className="relative z-10 flex flex-col items-center gap-8">
+           <div className="relative">
+              <div className="w-24 h-24 bg-indigo-600/10 border-2 border-indigo-500/20 rounded-[32px] flex items-center justify-center animate-pulse duration-700">
+                 <Activity size={40} className="text-indigo-400" />
+              </div>
+              <div className="absolute inset-0 w-24 h-24 border-b-2 border-indigo-400 rounded-[32px] animate-spin"></div>
+           </div>
+           
+           <div className="text-center space-y-2">
+              <h2 className="text-white text-[11px] font-black uppercase tracking-[0.4em] animate-pulse">Sincronizando Comando</h2>
+              <div className="w-48 h-1 bg-white/5 rounded-full overflow-hidden mx-auto">
+                 <div className="h-full bg-indigo-500 animate-loading-bar rounded-full"></div>
+              </div>
+           </div>
+        </div>
       </div>
     );
   }
 
   const access = checkUserAccess(profile);
 
-  // Middleware de Bloqueio se o usuário estiver logado mas sem acesso ativo ou trial expirado
+  // Bloqueio de Assinatura
   if (user && profile && !access.hasAccess && !profileLoading) {
     return <BillingLock profile={profile} onSignOut={() => auth.signOut()} />;
   }
 
-  if (user) {
-    return <Dashboard user={user} />;
-  }
-
-  if (currentView === 'login') {
-    return (
-      <Login 
-        onLogin={() => setCurrentView('dashboard')} 
-        onBackToLanding={() => setCurrentView('landing')} 
-      />
-    );
-  }
-
   return (
-    <LandingPage 
-      onEntrar={() => setCurrentView('login')} 
-      onTesteGratis={() => setCurrentView('login')} 
-    />
+    <div className={`transition-opacity duration-500 w-full ${isExiting ? 'opacity-0' : 'opacity-100'}`}>
+      {user ? (
+        <Dashboard user={user} />
+      ) : currentView === 'login' ? (
+        <Login 
+          onLogin={() => navigateTo('dashboard')} 
+          onBackToLanding={() => navigateTo('landing')} 
+        />
+      ) : (
+        <LandingPage 
+          onEntrar={() => navigateTo('login')} 
+          onTesteGratis={() => navigateTo('login')} 
+        />
+      )}
+    </div>
   );
 };
 

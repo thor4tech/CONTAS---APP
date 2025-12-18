@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>Cria Gestão Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <style>
       html, body { 
         font-family: 'Inter', sans-serif;
@@ -17,26 +17,35 @@
         position: relative;
         touch-action: manipulation;
         -webkit-overflow-scrolling: touch;
+        scroll-behavior: smooth;
       }
       #root {
         width: 100%;
         min-height: 100vh;
         overflow-x: hidden;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
       }
       .no-scrollbar::-webkit-scrollbar { display: none; }
       .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       
-      input, select, textarea {
-        font-size: 16px !important;
+      .transition-all { transition-duration: 400ms !important; }
+
+      @keyframes loading-bar {
+        0% { width: 0%; left: 0; }
+        50% { width: 50%; left: 25%; }
+        100% { width: 100%; left: 0; }
+      }
+      .animate-loading-bar {
+        animation: loading-bar 1.5s infinite ease-in-out;
       }
 
-      /* Ajustes extras mobile */
+      /* Removendo arredondados exagerados globais */
+      .rounded-pill { border-radius: 9999px; }
+      .rounded-3xl { border-radius: 24px; }
+      .rounded-4xl { border-radius: 32px; }
+
+      /* Suporte a mobile devices */
       @media (max-width: 640px) {
-        .xs\:inline { display: inline; }
-        .xs\:hidden { display: none; }
+        .mobile-pill-menu { bottom: 20px; left: 10px; right: 10px; }
       }
     </style>
   <script type="importmap">
