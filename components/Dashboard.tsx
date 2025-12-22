@@ -9,55 +9,81 @@ import PartnerManager from './PartnerManager';
 import CalendarView from './CalendarView';
 import SettingsModal from './SettingsModal';
 import AnalyticsView from './AnalyticsView';
-import ReferralView from './ReferralView';
-import OnboardingWizard from './Onboarding/OnboardingWizard';
 import { 
-  Wallet, ChevronLeft, ChevronRight, LayoutDashboard, 
+  ChevronLeft, ChevronRight, LayoutDashboard, 
   Calendar, List, Users, Activity, 
   Landmark, Zap, Settings, CreditCard as CardIcon, 
   BarChart3, Heart, TrendingDown, TrendingUp, Clock, ShieldCheck,
-  Briefcase, Eye, EyeOff, Shield
+  Briefcase, Eye, EyeOff, Info, Target, ArrowUpRight
 } from 'lucide-react';
 
 interface DashboardProps {
   user: any;
 }
 
-const KPIItem = ({ label, value, sub, icon: Icon, color, special, showValues, dual }: any) => (
-  <div className={`relative flex flex-col justify-between p-6 md:p-8 rounded-[40px] border transition-all group shadow-2xl overflow-hidden min-h-[180px] ${special ? 'bg-[#020617] text-white border-blue-500/30' : 'bg-white border-slate-100'}`}>
-    <div className="relative z-10">
-      <span className={`text-[9px] font-black uppercase tracking-[0.2em] block mb-4 ${special ? 'text-blue-400' : 'text-slate-400'}`}>{label}</span>
-      {dual ? (
-        <div className="space-y-4">
-          <div>
-            <span className="text-[8px] font-bold text-white/40 uppercase block mb-1 tracking-widest">Poder Total (C/ Reserva):</span>
-            <div className="text-xl md:text-2xl font-black font-mono tracking-tighter text-[#4ade80] drop-shadow-[0_0_10px_rgba(74,222,128,0.3)]">
-              {showValues ? (value.comReserva || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'R$ ••••••'}
-            </div>
-          </div>
-          <div className="pt-3 border-t border-white/10">
-            <span className="text-[8px] font-bold text-white/40 uppercase block mb-1 tracking-widest">Líquido (S/ Reserva):</span>
-            <div className="text-lg md:text-xl font-black font-mono tracking-tighter text-white">
-              {showValues ? (value.semReserva || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'R$ ••••••'}
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div className={`text-2xl md:text-3xl font-black font-mono tracking-tighter ${special ? 'text-white' : color}`}>
-          {showValues ? (value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'R$ ••••••'}
-        </div>
-      )}
+const Tooltip = ({ text }: { text: string }) => (
+  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-56 p-4 bg-slate-900 text-white text-[10px] font-medium rounded-2xl shadow-2xl z-[200] animate-in fade-in zoom-in-95 leading-relaxed border border-white/10">
+    <div className="flex items-center gap-2 mb-2 text-indigo-400 font-black uppercase tracking-widest border-b border-white/10 pb-1">
+      <Info size={12} /> Dica Estratégica
     </div>
-    <div className={`absolute top-6 right-6 p-3 rounded-2xl border ${special ? 'bg-blue-600/20 border-blue-500/30 text-blue-400' : 'bg-slate-50 border-slate-100 ' + color}`}>
-      <Icon size={20} />
-    </div>
-    {!dual && <span className={`text-[8px] font-black uppercase tracking-[0.2em] relative z-10 mt-4 ${special ? 'text-white/40' : 'text-slate-300'}`}>{sub}</span>}
+    {text}
+    <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-slate-900"></div>
   </div>
 );
+
+const KPIItem = ({ label, value, sub, icon: Icon, color, special, showValues, dual, info }: any) => {
+  const [showInfo, setShowInfo] = useState(false);
+
+  return (
+    <div className={`relative flex flex-col justify-between p-6 md:p-8 rounded-[40px] border transition-all group shadow-2xl overflow-hidden min-h-[180px] ${special ? 'bg-[#020617] text-white border-blue-500/30' : 'bg-white border-slate-100'}`}>
+      <div className="relative z-10">
+        <div className="flex items-center gap-2 mb-4">
+          <span className={`text-[9px] font-black uppercase tracking-[0.2em] block ${special ? 'text-blue-400' : 'text-slate-400'}`}>{label}</span>
+          <div className="relative">
+            <button 
+              onMouseEnter={() => setShowInfo(true)}
+              onMouseLeave={() => setShowInfo(false)}
+              onClick={() => setShowInfo(!showInfo)}
+              className="p-1 rounded-full hover:bg-slate-100 transition-colors"
+            >
+              <Info size={14} className={special ? 'text-blue-400/50' : 'text-slate-300'} />
+            </button>
+            {showInfo && <Tooltip text={info} />}
+          </div>
+        </div>
+        {dual ? (
+          <div className="space-y-4">
+            <div>
+              <span className="text-[8px] font-bold text-white/40 uppercase block mb-1 tracking-widest">Poder Total (C/ Reserva):</span>
+              <div className="text-xl md:text-2xl font-black font-mono tracking-tighter text-[#4ade80] drop-shadow-[0_0_10px_rgba(74,222,128,0.3)]">
+                {showValues ? (value.comReserva || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'R$ ••••••'}
+              </div>
+            </div>
+            <div className="pt-3 border-t border-white/10">
+              <span className="text-[8px] font-bold text-white/40 uppercase block mb-1 tracking-widest">Líquido (S/ Reserva):</span>
+              <div className="text-lg md:text-xl font-black font-mono tracking-tighter text-white">
+                {showValues ? (value.semReserva || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'R$ ••••••'}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className={`text-2xl md:text-3xl font-black font-mono tracking-tighter ${special ? 'text-white' : color}`}>
+            {showValues ? (value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'R$ ••••••'}
+          </div>
+        )}
+      </div>
+      <div className={`absolute top-6 right-6 p-3 rounded-2xl border ${special ? 'bg-blue-600/20 border-blue-500/30 text-blue-400' : 'bg-slate-50 border-slate-100 ' + color}`}>
+        <Icon size={20} />
+      </div>
+      {!dual && <span className={`text-[8px] font-black uppercase tracking-[0.2em] relative z-10 mt-4 ${special ? 'text-white/40' : 'text-slate-300'}`}>{sub}</span>}
+    </div>
+  );
+};
 
 const AssetCard = ({ item, onUpdateBalance, showValues, onUpdateDetail, isReserva }: any) => {
   const [val, setVal] = useState(item.balance?.toString() || "0");
   const [isEditing, setIsEditing] = useState(false);
+  const [showInfo, setShowInfo] = useState(false);
 
   useEffect(() => {
     if (!isEditing) setVal(item.balance?.toString() || "0");
@@ -68,8 +94,18 @@ const AssetCard = ({ item, onUpdateBalance, showValues, onUpdateDetail, isReserv
       ${isReserva ? 'bg-[#0f172a] border-blue-500/40 border-2' : 'bg-white border-slate-100 hover:border-blue-200'}
     `}>
        {isReserva && (
-         <div className="absolute top-0 right-0 p-3 z-20">
-            <div className="bg-amber-500 text-black text-[8px] font-black px-3 py-1 rounded-full shadow-lg animate-pulse uppercase tracking-widest">
+         <div className="absolute top-0 right-0 p-3 z-20 flex items-center gap-2">
+            <div className="relative">
+              <button 
+                onMouseEnter={() => setShowInfo(true)}
+                onMouseLeave={() => setShowInfo(false)}
+                className="p-1"
+              >
+                <Info size={12} className="text-blue-400" />
+              </button>
+              {showInfo && <Tooltip text="Sua Reserva de Emergência deve ser mantida em ativos de alta liquidez e baixo risco. Ela não entra no cálculo de lucro operacional." />}
+            </div>
+            <div className="bg-amber-500 text-black text-[7px] font-black px-3 py-1 rounded-full shadow-lg animate-pulse uppercase tracking-widest">
               PROTEGIDO
             </div>
          </div>
@@ -84,12 +120,13 @@ const AssetCard = ({ item, onUpdateBalance, showValues, onUpdateDetail, isReserv
                 <h5 className={`text-[10px] font-black uppercase tracking-widest ${isReserva ? 'text-white' : 'text-slate-900'}`}>{item.name}</h5>
                 {item.type === 'card' && (
                    <div className="flex items-center gap-2 mt-1">
-                     <span className="text-[7px] font-black text-slate-400 uppercase">Dia Venc:</span>
+                     <span className="text-[7px] font-black text-slate-400 uppercase">Vencimento:</span>
                      <input 
-                       type="number" 
-                       className="w-10 text-[10px] font-black text-blue-600 bg-slate-50 border border-slate-200 rounded px-1.5 py-0.5 outline-none focus:border-blue-400"
+                       type="text" 
+                       className="w-14 text-[11px] font-black text-blue-600 bg-slate-50 border-2 border-slate-200 rounded-xl px-2 py-1 outline-none focus:border-blue-400 transition-all"
                        value={item.dueDate || ''}
                        onChange={e => onUpdateDetail('dueDate', e.target.value)}
+                       placeholder="Ex: 15"
                      />
                    </div>
                 )}
@@ -120,7 +157,7 @@ const AssetCard = ({ item, onUpdateBalance, showValues, onUpdateDetail, isReserv
             <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Status da Fatura:</span>
             <button 
               onClick={() => onUpdateDetail('situation', item.situation === 'PAGO' ? 'PENDENTE' : 'PAGO')}
-              className={`px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest border transition-all ${item.situation === 'PAGO' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-amber-50 text-amber-600 border-amber-200'}`}
+              className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border transition-all shadow-sm ${item.situation === 'PAGO' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-amber-50 text-amber-600 border-amber-200'}`}
             >
               {item.situation || 'PENDENTE'}
             </button>
@@ -163,20 +200,32 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
   
   const currentMonthData = useMemo(() => {
     const found = appState.data.find(d => `${d.year}-${(MONTHS.indexOf(d.month) + 1).toString().padStart(2, '0')}` === currentMonthId);
-    const base = found || { transactions: [], balances: {}, reserva: 0, cardDetails: {}, reservaEmergencia: 0 };
+    const base = found || { transactions: [], balances: {}, reserva: 0, cardDetails: {}, reservaEmergencia: 0, month: appState.currentMonth, year: appState.currentYear, metaFaturamento: 0 };
     const assets = appState.userProfile.globalAssets || [];
-    return {
+    
+    // Assegurar que os campos obrigatórios de FinancialData existem para o TS
+    const completeData = {
       ...base,
+      month: base.month || appState.currentMonth,
+      year: base.year || appState.currentYear,
+      metaFaturamento: base.metaFaturamento || 0,
+      reserva: base.reserva || 0,
+      balances: base.balances || {},
+      transactions: base.transactions || [],
       reservaEmergencia: base.reservaEmergencia || 0,
-      accounts: assets.filter(a => a.type === 'bank').map(a => ({ ...a, balance: (base.balances || {})[a.id] || 0 })),
+    } as FinancialData;
+
+    return {
+      ...completeData,
+      accounts: assets.filter(a => a.type === 'bank').map(a => ({ ...a, balance: (completeData.balances || {})[a.id] || 0 })),
       creditCards: assets.filter(a => a.type === 'card').map(a => ({ 
         ...a, 
-        balance: (base.balances || {})[a.id] || 0, 
-        dueDate: base.cardDetails?.[a.id]?.dueDate || '10', 
-        situation: base.cardDetails?.[a.id]?.situation || 'PENDENTE' 
+        balance: (completeData.balances || {})[a.id] || 0, 
+        dueDate: completeData.cardDetails?.[a.id]?.dueDate || '10', 
+        situation: completeData.cardDetails?.[a.id]?.situation || 'PENDENTE' 
       }))
     };
-  }, [currentMonthId, appState.data, appState.userProfile]);
+  }, [currentMonthId, appState.data, appState.userProfile, appState.currentMonth, appState.currentYear]);
 
   const totals = useMemo(() => {
     const txs = currentMonthData.transactions || [];
@@ -190,19 +239,19 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
     
     const totalCarteira = currentMonthData.accounts.reduce((a, b) => a + (b.balance || 0), 0);
     const res = currentMonthData.reservaEmergencia || 0;
+    const meta = appState.userProfile.defaultMeta || 0;
     
-    // Novas fórmulas solicitadas:
-    // TOTAL EM CARTEIRA + PENDENTE DE RECEBIMENTO + RESERVA - DIVIDA PENDENTE.
     const comReserva = totalCarteira + fatPend + res - divPend;
-    // TOTAL EM CARTEIRA + PENDENTE DE RECEBIMENTO - DIVIDA PENDENTE.
     const semReserva = totalCarteira + fatPend - divPend;
+    const metaProgresso = meta > 0 ? (fatReal / meta) * 100 : 0;
+    const gapMeta = Math.max(0, meta - fatReal);
 
     return { 
-      fatTotal, fatReal, fatPend, divTotal, divPend, totalCarteira, 
+      fatTotal, fatReal, fatPend, divTotal, divPend, totalCarteira, meta, metaProgresso, gapMeta,
       comandoReal: { comReserva, semReserva },
       reserva: res
     };
-  }, [currentMonthData]);
+  }, [currentMonthData, appState.userProfile.defaultMeta]);
 
   const changeMonth = (dir: number) => {
     let mIdx = MONTHS.indexOf(appState.currentMonth) + dir;
@@ -272,24 +321,55 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 w-full animate-in slide-in-from-bottom-5 duration-700 items-start">
             <div className="lg:col-span-8 space-y-8">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <KPIItem showValues={showValues} label="Faturamento Previsto" value={totals.fatTotal} color="text-slate-900" icon={TrendingUp} sub="Total de entradas projetadas" />
-                <KPIItem showValues={showValues} label="Faturamento Real" value={totals.fatReal} color="text-emerald-600" icon={ShieldCheck} sub="O que já está no bolso" />
-                <KPIItem showValues={showValues} label="Dívida Total" value={totals.divTotal} color="text-slate-900" icon={TrendingDown} sub="Saídas fixas + faturas totais" />
-                <KPIItem showValues={showValues} label="Dívida Pendente" value={totals.divPend} color="text-rose-600" icon={Clock} sub="O que falta pagar no mês" />
+                <KPIItem showValues={showValues} label="Faturamento Previsto" value={totals.fatTotal} color="text-slate-900" icon={TrendingUp} sub="Total projetado no fluxo" info="A soma de todas as receitas planejadas para este mês, independente de já terem sido recebidas. Representa seu teto de faturamento mensal." />
+                <KPIItem showValues={showValues} label="Faturamento Real" value={totals.fatReal} color="text-emerald-600" icon={ShieldCheck} sub="O que já caiu na conta" info="Dinheiro que efetivamente entrou no seu caixa. Use isso para medir sua liquidez imediata e capacidade de pagamento." />
+                <KPIItem showValues={showValues} label="Dívida Total" value={totals.divTotal} color="text-slate-900" icon={TrendingDown} sub="Custos fixos + Variáveis" info="A soma de todas as despesas planejadas e faturas de cartão para o período. Define seu ponto de equilíbrio operacional." />
+                <KPIItem showValues={showValues} label="Dívida Pendente" value={totals.divPend} color="text-rose-600" icon={Clock} sub="O que falta pagar hoje" info="Compromissos financeiros que ainda não foram marcados como pagos no sistema. É o que ainda vai sair do seu bolso este mês." />
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <KPIItem dual showValues={showValues} label="Saldo de Comando Real" value={totals.comandoReal} icon={Zap} special />
-                <KPIItem showValues={showValues} label="Carteira Global (Disponível)" value={totals.totalCarteira} color="text-indigo-600" icon={Briefcase} sub="Soma de todos os saldos bancários" />
+                <KPIItem dual showValues={showValues} label="Saldo de Comando Real" value={totals.comandoReal} icon={Zap} special info="Sua projeção de caixa real: (Carteira Total + Receitas a Receber + Reserva Protegida) - Dívidas Pendentes." />
+                <KPIItem showValues={showValues} label="Carteira Global" value={totals.totalCarteira} color="text-indigo-600" icon={Briefcase} sub="Liquidez Bancária" info="A soma de todos os saldos informados nos seus Bancos Ativos em tempo real." />
               </div>
               
-              <div className="bg-white p-10 rounded-[48px] border border-slate-100 shadow-xl flex flex-col gap-6">
-                 <div className="flex items-center gap-3">
-                    <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl"><ShieldCheck size={24}/></div>
-                    <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter">Visão Estratégica {appState.currentMonth}</h3>
+              <div className="bg-white p-10 rounded-[48px] border border-slate-100 shadow-xl flex flex-col gap-8 relative overflow-hidden">
+                 <div className="absolute top-0 right-0 p-12 opacity-5 text-indigo-600"><Target size={120}/></div>
+                 <div className="flex items-center justify-between relative z-10">
+                    <div className="flex items-center gap-3">
+                       <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl"><ShieldCheck size={24}/></div>
+                       <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter">Visão Estratégica {appState.currentMonth}</h3>
+                       <div className="relative">
+                          <button onMouseEnter={() => setShowValues(true)} className="p-1"><Info size={14} className="text-slate-300" /></button>
+                       </div>
+                    </div>
+                    {showValues && (
+                      <div className="text-right">
+                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Meta: {totals.meta.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'})}</span>
+                      </div>
+                    )}
                  </div>
-                 <p className="text-slate-500 text-sm font-medium leading-relaxed">
-                   Seu saldo de comando projeta seu poder de fogo real. A métrica líquida ignora a reserva protegida, focando exclusivamente na operação. Use este número para guiar investimentos agressivos ou contenção de danos.
+
+                 <div className="space-y-4 relative z-10">
+                    <div className="flex justify-between items-end mb-1">
+                       <div className="flex items-center gap-2">
+                          <span className="text-[11px] font-black text-slate-900 uppercase tracking-widest">Atingimento de Meta</span>
+                          <div className="relative">
+                            <button className="p-1" onMouseEnter={() => {}}><Info size={12} className="text-slate-300" /></button>
+                          </div>
+                       </div>
+                       <span className="text-sm font-black font-mono text-indigo-600">{totals.metaProgresso.toFixed(1)}%</span>
+                    </div>
+                    <div className="h-4 bg-slate-100 rounded-full overflow-hidden border border-slate-50 p-1">
+                       <div className="h-full bg-gradient-to-r from-indigo-500 to-blue-400 rounded-full transition-all duration-1000 shadow-lg" style={{ width: `${Math.min(100, totals.metaProgresso)}%` }}></div>
+                    </div>
+                    <div className="flex items-center gap-2 mt-2">
+                       <ArrowUpRight size={14} className="text-indigo-500" />
+                       <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Faltam <span className="text-slate-900">{showValues ? totals.gapMeta.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'}) : 'R$ •••'}</span> para bater a meta.</span>
+                    </div>
+                 </div>
+
+                 <p className="text-slate-500 text-sm font-medium leading-relaxed relative z-10 border-t border-slate-50 pt-6">
+                   Seu faturamento real representa {totals.metaProgresso.toFixed(1)}% da meta de <span className="font-bold text-slate-900">{showValues ? totals.meta.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'}) : 'R$ •••'}</span>. Use a aba "Estratégia" para ver táticas da IA para liquidar o gap restante.
                  </p>
               </div>
             </div>
@@ -321,7 +401,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                </div>
 
                <div className="bg-white p-8 rounded-[48px] border border-slate-100 shadow-2xl">
-                  <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-blue-600 mb-8 flex items-center gap-2"><Landmark size={18}/> Bancos Ativos</h4>
+                  <div className="flex items-center justify-between mb-8">
+                    <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-blue-600 flex items-center gap-2"><Landmark size={18}/> Bancos Ativos</h4>
+                    <div className="relative">
+                      <button onMouseEnter={() => {}} className="p-1"><Info size={12} className="text-slate-300" /></button>
+                    </div>
+                  </div>
                   <div className="space-y-4">
                     {currentMonthData.accounts.length > 0 ? currentMonthData.accounts.map(acc => (
                       <AssetCard key={acc.id} item={acc} showValues={showValues} onUpdateBalance={(v: number) => updateAsset(acc.id, v)} />
@@ -332,7 +417,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                </div>
                
                <div className="bg-white p-8 rounded-[48px] border border-slate-100 shadow-2xl">
-                  <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-rose-500 mb-8 flex items-center gap-2"><CardIcon size={18}/> Faturas Ativas</h4>
+                  <div className="flex items-center justify-between mb-8">
+                    <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-rose-500 flex items-center gap-2"><CardIcon size={18}/> Faturas Ativas</h4>
+                    <div className="relative">
+                      <button onMouseEnter={() => {}} className="p-1"><Info size={12} className="text-slate-300" /></button>
+                    </div>
+                  </div>
                   <div className="space-y-4">
                     {currentMonthData.creditCards.length > 0 ? currentMonthData.creditCards.map(card => (
                       <AssetCard key={card.id} item={card} showValues={showValues} onUpdateBalance={(v: number) => updateAsset(card.id, v)} onUpdateDetail={(f: string, v: any) => updateCardDetail(card.id, f, v)} />

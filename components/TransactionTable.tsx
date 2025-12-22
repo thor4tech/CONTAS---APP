@@ -1,10 +1,8 @@
 
 import React, { useState, useMemo } from 'react';
 import { BaseTransaction, Category, Partner } from '../types';
-import { Trash2, Plus, Edit3, Activity, Shield, TrendingUp, TrendingDown, Clock, CheckCircle2, AlertCircle, GripVertical, Target, Zap, ShieldCheck, ChevronRight, LayoutGrid } from 'lucide-react';
-// Fix: Removed missing parseISO and startOfMonth, using native Date parsing instead
+import { Trash2, Plus, Edit3, Activity, TrendingUp, TrendingDown, GripVertical, Info } from 'lucide-react';
 import { format, endOfMonth } from 'date-fns';
-// Fix: Use more specific import for ptBR to avoid root export issues
 import { ptBR } from 'date-fns/locale/pt-BR';
 
 interface Props {
@@ -22,6 +20,16 @@ interface Props {
   onReorder?: (newData: BaseTransaction[]) => void;
   showValues?: boolean;
 }
+
+const Tooltip = ({ text }: { text: string }) => (
+  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-56 p-4 bg-slate-900 text-white text-[10px] font-medium rounded-2xl shadow-2xl z-[200] animate-in fade-in zoom-in-95 leading-relaxed border border-white/10">
+    <div className="flex items-center gap-2 mb-2 text-indigo-400 font-black uppercase tracking-widest border-b border-white/10 pb-1">
+      <Info size={12} /> Guia do Fluxo
+    </div>
+    {text}
+    <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-slate-900"></div>
+  </div>
+);
 
 class MetricasFluxo {
   entradas: BaseTransaction[];
@@ -41,7 +49,6 @@ class MetricasFluxo {
   calcularPendente() { return this.entradas.filter(e => e.situation === 'PENDENTE').reduce((acc, e) => acc + (e.value || 0), 0); }
   calcularFaltaProjetadaEntradas() {
     return this.entradas.filter(e => {
-        // Fix: Replace parseISO with native Date parsing for local time
         const venc = e.dueDate ? new Date(e.dueDate + 'T00:00:00') : new Date(2100, 0, 1);
         return e.situation === 'PENDENTE' && venc < this.hoje;
       }).reduce((acc, e) => acc + (e.value || 0), 0);
@@ -51,13 +58,10 @@ class MetricasFluxo {
   calcularRestante() { return this.saidas.filter(s => s.situation === 'PENDENTE').reduce((acc, s) => acc + (s.value || 0), 0); }
   calcularFaltaProjetadaSaidas() {
     return this.saidas.filter(s => {
-        // Fix: Replace parseISO with native Date parsing for local time
         const venc = s.dueDate ? new Date(s.dueDate + 'T00:00:00') : new Date(2100, 0, 1);
         return s.situation === 'PENDENTE' && venc <= this.fimMes;
       }).reduce((acc, s) => acc + (s.value || 0), 0);
   }
-  calcularSaldoProjetado() { return this.calcularFaturamentoTotal() - this.calcularDividaTotal(); }
-  calcularBalancoLiquido() { return this.calcularRecebido() - this.calcularPago(); }
 }
 
 const TransactionTable: React.FC<Props> = ({ title, color, data, categories, partners, onToggleStatus, onDelete, onEdit, onAddNew, onQuickUpdate, totals, onReorder, showValues = true }) => {
@@ -69,12 +73,9 @@ const TransactionTable: React.FC<Props> = ({ title, color, data, categories, par
   const formatDateLabel = (dateStr: string) => { 
     try { 
       if (!dateStr) return '--/--'; 
-      // Fix: Replace parseISO with native Date parsing for local time
       const date = new Date(dateStr + 'T00:00:00');
       return format(date, 'dd/MM', { locale: ptBR }); 
-    } catch { 
-      return '--/--'; 
-    } 
+    } catch { return '--/--'; } 
   };
 
   const handleDragStart = (idx: number) => setDraggedIdx(idx);
@@ -135,7 +136,7 @@ const TransactionTable: React.FC<Props> = ({ title, color, data, categories, par
             <tr>
               <th className="px-8 py-6 w-10"></th>
               <th className="px-8 py-6">Data</th>
-              <th className="px-8 py-6">Descrição da Operação</th>
+              <th className="px-8 py-6">Descrição</th>
               <th className="px-8 py-6">Valor Real</th>
               <th className="px-8 py-6 text-center">Status</th>
               <th className="px-8 py-6 text-right">Ações</th>
@@ -168,62 +169,52 @@ const TransactionTable: React.FC<Props> = ({ title, color, data, categories, par
         </table>
       </div>
 
-      {/* === PDF v3.0: NOVA ÁREA DE MÉTRICAS (GRID DE 4 COLUNAS) === */}
       <div className="bg-slate-100/50 border-t border-slate-200 p-10 space-y-10 animate-in fade-in duration-1000">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-             <MetricaResumo label={isIncome ? "FATURAMENTO TOTAL" : "DÍVIDA TOTAL"} value={metrics.total} color="text-slate-900" bg="bg-white" sub="Soma de todas transações" formatValue={formatValue} />
-             <MetricaResumo label={isIncome ? "RECEBIDO ✓" : "PAGO ✓"} value={metrics.realizado} color="text-emerald-600" bg="bg-emerald-50/50" sub={`${metrics.taxa.toFixed(0)}% do planejado`} formatValue={formatValue} progress={metrics.taxa} />
-             <MetricaResumo label={isIncome ? "PENDENTE ⏳" : "RESTANTE"} value={metrics.pendente} color="text-amber-600" bg="bg-amber-50/50" sub={isIncome ? "A receber ainda" : "A pagar ainda"} formatValue={formatValue} />
-             <MetricaResumo label="FALTA PROJETADA" value={metrics.falta} color="text-rose-600" bg="bg-rose-50/50" sub={isIncome ? "Vencidos não recebidos" : "A vencer este mês"} formatValue={formatValue} pulse={metrics.falta > 0} />
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-             <div className="bg-[#020617] p-8 rounded-[40px] text-white flex items-center gap-6 shadow-3xl group transition-all hover:translate-y-[-4px]">
-                <div className="p-4 bg-white/10 rounded-3xl group-hover:bg-indigo-600 transition-colors"><ShieldCheck size={32} className="text-indigo-400 group-hover:text-white" /></div>
-                <div className="flex-1 min-w-0">
-                   <div className="flex justify-between items-center mb-2">
-                      <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40">SALDO PROJETADO</span>
-                      <span className="text-[8px] font-black uppercase tracking-widest text-indigo-400">ENTRADAS - SAÍDAS</span>
-                   </div>
-                   <div className="text-2xl font-black font-mono tracking-tighter truncate">{formatValue(totals.liquidHealthNoReserve || 0)}</div>
-                </div>
-             </div>
-             
-             <div className="bg-white p-8 rounded-[40px] border border-slate-200 flex items-center gap-6 shadow-xl group transition-all hover:translate-y-[-4px]">
-                <div className="p-4 bg-emerald-50 rounded-3xl group-hover:bg-emerald-600 transition-colors"><Target size={32} className="text-emerald-600 group-hover:text-white" /></div>
-                <div className="flex-1 min-w-0">
-                   <div className="flex justify-between items-center mb-2">
-                      <span className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">BALANÇO LÍQUIDO</span>
-                      <span className="text-[8px] font-black uppercase tracking-widest text-emerald-600">RECEBIDO - PAGO</span>
-                   </div>
-                   <div className="text-2xl font-black font-mono tracking-tighter text-emerald-600 truncate">{formatValue(isIncome ? metrics.realizado : -metrics.realizado)}</div>
-                </div>
-             </div>
+             <MetricaResumo label={isIncome ? "FATURAMENTO TOTAL" : "DÍVIDA TOTAL"} value={metrics.total} color="text-slate-900" bg="bg-white" sub="Total planejado" formatValue={formatValue} info={isIncome ? "A soma bruta de tudo o que você planejou faturar este mês." : "A soma de todos os seus compromissos financeiros planejados."} />
+             <MetricaResumo label={isIncome ? "RECEBIDO ✓" : "PAGO ✓"} value={metrics.realizado} color="text-emerald-600" bg="bg-emerald-50/50" sub={`${metrics.taxa.toFixed(0)}% do total`} formatValue={formatValue} progress={metrics.taxa} info={isIncome ? "Valor que efetivamente entrou no caixa." : "Total das contas que já foram quitadas."} />
+             <MetricaResumo label={isIncome ? "PENDENTE ⏳" : "RESTANTE"} value={metrics.pendente} color="text-amber-600" bg="bg-amber-50/50" sub={isIncome ? "A receber" : "A pagar"} formatValue={formatValue} info={isIncome ? "Dinheiro que você ainda está esperando cair na conta." : "O que você ainda precisa pagar para fechar o mês."} />
+             <MetricaResumo label="DÉFICIT/SUPERÁVIT" value={metrics.falta} color="text-rose-600" bg="bg-rose-50/50" sub="Falta/Sobra" formatValue={formatValue} pulse={metrics.falta > 0} info="A diferença entre o que foi planejado e o que foi realizado. Se negativo, você superou a meta!" />
           </div>
       </div>
     </div>
   );
 };
 
-const MetricaResumo = ({ label, value, color, bg, sub, formatValue, progress, pulse }: any) => (
-  <div className={`${bg} p-6 rounded-[32px] border border-slate-200 shadow-lg flex flex-col justify-between h-[150px] relative transition-all hover:shadow-xl ${pulse ? 'animate-pulse' : ''}`}>
-     <div>
-        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">{label}</span>
-        <div className={`text-xl font-black font-mono tracking-tighter ${color}`}>{formatValue(value)}</div>
-     </div>
-     <div className="mt-4">
-        {progress !== undefined ? (
-          <div className="space-y-2">
-             <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                <div className="h-full bg-emerald-500 transition-all duration-1000" style={{ width: `${progress}%` }}></div>
+const MetricaResumo = ({ label, value, color, bg, sub, formatValue, progress, pulse, info }: any) => {
+  const [showInfo, setShowInfo] = useState(false);
+  return (
+    <div className={`${bg} p-6 rounded-[32px] border border-slate-200 shadow-lg flex flex-col justify-between h-[150px] relative transition-all hover:shadow-xl ${pulse ? 'animate-pulse' : ''}`}>
+       <div className="flex justify-between items-start">
+          <div className="flex items-center gap-2">
+             <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">{label}</span>
+             <div className="relative">
+                <button 
+                  onMouseEnter={() => setShowInfo(true)}
+                  onMouseLeave={() => setShowInfo(false)}
+                  className="p-1"
+                >
+                  <Info size={12} className="text-slate-300 hover:text-indigo-500" />
+                </button>
+                {showInfo && <Tooltip text={info} />}
              </div>
-             <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">{sub}</span>
           </div>
-        ) : (
-          <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">{sub}</span>
-        )}
-     </div>
-  </div>
-);
+          <div className={`text-xl font-black font-mono tracking-tighter ${color}`}>{formatValue(value)}</div>
+       </div>
+       <div className="mt-4">
+          {progress !== undefined ? (
+            <div className="space-y-2">
+               <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                  <div className="h-full bg-emerald-500 transition-all duration-1000" style={{ width: `${progress}%` }}></div>
+               </div>
+               <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">{sub}</span>
+            </div>
+          ) : (
+            <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">{sub}</span>
+          )}
+       </div>
+    </div>
+  );
+};
 
 export default TransactionTable;
