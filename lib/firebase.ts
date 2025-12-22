@@ -1,8 +1,8 @@
+
 // Standard Firebase v9 modular imports
-// @ts-ignore - Some environments have issues resolving named exports from firebase/app subpath
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { getFirestore, enableIndexedDbPersistence } from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: "AIzaSyAYWXZxgYqcOlt-yI_-pBUG4QvR5eqS4cM",
@@ -14,9 +14,17 @@ const firebaseConfig = {
   measurementId: "G-Y0MS36R6ZG"
 };
 
-// Initialize the Firebase application with modular SDK syntax
 const app = initializeApp(firebaseConfig);
-
-// Export authorized services
 export const auth = getAuth(app);
 export const db = getFirestore(app);
+
+// === PDF v3.0: Habilitar persistência offline ===
+if (typeof window !== 'undefined') {
+  enableIndexedDbPersistence(db).catch((err) => {
+    if (err.code === 'failed-precondition') {
+      console.warn('Persistência offline não disponível (múltiplas abas)');
+    } else if (err.code === 'unimplemented') {
+      console.warn('Navegador não suporta persistência offline');
+    }
+  });
+}

@@ -1,6 +1,7 @@
 
 import { UserProfile, PlanId, SubscriptionStatus } from '../types';
-import { isAfter, parseISO, isValid, addDays } from 'date-fns';
+// Fix: Removed missing parseISO, using native Date constructor instead
+import { isAfter, isValid, addDays } from 'date-fns';
 
 export interface AccessResult {
   hasAccess: boolean;
@@ -33,7 +34,8 @@ export function checkUserAccess(profile: UserProfile | null): AccessResult {
 
   const now = new Date();
   if (profile.subscriptionStatus === 'TRIAL') {
-    const createdAt = profile.createdAt ? parseISO(profile.createdAt) : now;
+    // Fix: Replace parseISO with native Date constructor for full ISO strings
+    const createdAt = profile.createdAt ? new Date(profile.createdAt) : now;
     const trialEnd = addDays(createdAt, 7);
     const trialExpired = isAfter(now, trialEnd);
 

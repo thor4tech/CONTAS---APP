@@ -9,7 +9,8 @@ import Dashboard from './components/Dashboard';
 import LandingPage from './components/LandingPage';
 import { UserProfile, PlanId, SubscriptionStatus } from './types';
 import { checkUserAccess, KIWIFY_LINKS } from './lib/subscription';
-import { addDays, parseISO } from 'date-fns';
+// Fix: Removed missing parseISO, using native Date constructor instead
+import { addDays } from 'date-fns';
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -158,7 +159,8 @@ const App: React.FC = () => {
 };
 
 const BillingLock = ({ profile, onSignOut }: { profile: UserProfile, onSignOut: () => void }) => {
-  const createdAt = profile.createdAt ? parseISO(profile.createdAt) : new Date();
+  // Fix: Replace parseISO with native Date constructor for full ISO strings
+  const createdAt = profile.createdAt ? new Date(profile.createdAt) : new Date();
   const updateCutoff = new Date('2025-05-23T00:00:00Z');
   const trialDuration = createdAt < updateCutoff ? 30 : 7;
 

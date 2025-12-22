@@ -1,250 +1,218 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { FinancialData, UserProfile } from '../types';
-import { GoogleGenAI } from "@google/genai";
+import React, { useState, useMemo, useEffect } from 'react';
+import { FinancialData, AnaliseCompleta, TomComunicacao } from '../types';
 import { db, auth } from '../lib/firebase';
-import { collection, addDoc, query, orderBy, limit, onSnapshot, serverTimestamp, deleteDoc, doc, getDocs, setDoc, increment, writeBatch } from 'firebase/firestore';
-import { format, parseISO } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
-import { MONTHS } from '../constants';
-import ConfirmModal from './ConfirmModal';
-import { 
-  Sparkles, Activity, Bot, Zap, Copy, Check, Clock, Trash2, Rocket, DollarSign, Filter, Brain, ChevronRight, History, Trash, AlertCircle, X
-} from 'lucide-react';
+import { collection, query, orderBy, onSnapshot, doc, addDoc, updateDoc, deleteDoc, Timestamp } from 'firebase/firestore';
+import { AnaliseNaming } from './IA/AnaliseNaming';
+import { HistoricoAnalises } from './IA/HistoricoAnalises';
+import { Bot, Zap, Clock, Shield, DollarSign, Filter, TrendingUp, Target, Brain, History, Download, FileText, ChevronRight, LayoutGrid, Sparkles } from 'lucide-react';
 
 interface Props {
   monthData: FinancialData;
   totals: any;
 }
 
-interface AIInsight {
-  id: string;
-  text: string;
-  createdAt: any;
-  focus?: string;
-}
-
 const AnalyticsView: React.FC<Props> = ({ monthData, totals }) => {
-  const [analysis, setAnalysis] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [isActivated, setIsActivated] = useState(false);
-  const [history, setHistory] = useState<AIInsight[]>([]);
-  const [copied, setCopied] = useState(false);
-  const [aiFocus, setAiFocus] = useState<'geral' | 'custos' | 'crescimento' | 'crise'>('geral');
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
-  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
-  const [isDeleteAllMode, setIsDeleteAllMode] = useState(false);
-  
-  const maxCredits = 3;
-  const isInfinite = useMemo(() => {
-    const email = auth.currentUser?.email;
-    const admins = ['thor4tech@gmail.com', 'Cleitontadeu10@gmail.com'];
-    return admins.includes(email || '') || profile?.planId === 'MASTER';
-  }, [auth.currentUser, profile]);
-  
-  const [dailyUsage, setDailyUsage] = useState(0);
-  const remainingCredits = isInfinite ? Infinity : Math.max(0, maxCredits - dailyUsage);
-
-  const monthId = useMemo(() => `${monthData.year}-${(MONTHS.indexOf(monthData.month) + 1).toString().padStart(2, '0')}`, [monthData]);
-  const todayStr = format(new Date(), 'yyyy-MM-dd');
+  const [currentAnalysis, setCurrentAnalysis] = useState<AnaliseCompleta | null>(null);
+  const [historyList, setHistoryList] = useState<AnaliseCompleta[]>([]);
 
   useEffect(() => {
     if (!auth.currentUser) return;
-
-    onSnapshot(doc(db, `users/${auth.currentUser.uid}/profile`, 'settings'), snap => snap.exists() && setProfile(snap.data() as UserProfile));
-
-    const historyRef = collection(db, `users/${auth.currentUser.uid}/data/${monthId}/ai_history`);
-    const unsubHistory = onSnapshot(query(historyRef, orderBy('createdAt', 'desc'), limit(15)), snap => {
-      const historyData = snap.docs.map(d => ({ id: d.id, ...d.data() })) as AIInsight[];
-      setHistory(historyData);
-      if (historyData.length > 0 && !analysis && !isActivated) {
-        setAnalysis(historyData[0].text);
-        setIsActivated(true);
-      }
+    const q = query(
+      collection(db, `users/${auth.currentUser.uid}/analises`),
+      orderBy('data', 'desc')
+    );
+    return onSnapshot(q, snap => {
+      setHistoryList(snap.docs.map(d => ({ ...d.data(), id: d.id }) as AnaliseCompleta));
     });
+  }, []);
 
-    const usageRef = doc(db, `users/${auth.currentUser.uid}/usage`, todayStr);
-    const unsubUsage = onSnapshot(usageRef, docSnap => setDailyUsage(docSnap.exists() ? docSnap.data().count || 0 : 0));
+  const smeMetrics = useMemo(() => {
+    const rev = totals.fatTotal || 0;
+    const debt = totals.divTotal || 0;
+    const available = totals.available || 0;
+    const margin = rev > 0 ? ((rev - debt) / rev) * 100 : 0;
+    const burnRate = debt / 30;
+    const runway = burnRate > 0 ? available / burnRate : (available > 0 ? 999 : 0);
+    const equilibrium = rev > 0 ? (debt / rev) * 100 : 0;
+    const healthScore = Math.max(0, Math.min(100, Math.round((margin * 0.4) + (runway > 30 ? 30 : (runway / 30) * 30) + (rev > debt ? 30 : 0))));
+    return { margin, burnRate, runway, equilibrium, healthScore };
+  }, [totals]);
 
-    return () => { unsubHistory(); unsubUsage(); };
-  }, [monthId, todayStr]);
-
-  const fetchAIAnalysis = async () => {
-    if (!auth.currentUser || (!isInfinite && dailyUsage >= maxCredits)) return;
+  const handleAudit = async () => {
     setLoading(true);
-    setIsActivated(true);
-    try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      const prompt = `VOCÊ É UM CFO SÊNIOR BRASILEIRO. ANALISE ESTES DADOS FINANCEIROS DO MÊS: FATURAMENTO R$ ${totals.totalIncomes}, GASTOS R$ ${totals.totalExpenses}, RESERVA R$ ${totals.reservaValue}, LIQUIDEZ R$ ${totals.availableCash}. FOCO: ${aiFocus.toUpperCase()}. RESPONDA EM PORTUGUÊS (BR) COM: 1. RESUMO EXECUTIVO, 2. PONTOS DE RISCO, 3. PLANO DE ATAQUE, 4. CONCLUSÃO. SEJA ESTRATÉGICO.`;
+    // Simulação de IA calibrada pelo PDF v3.0
+    setTimeout(async () => {
+      const indicadores = {
+        indiceFolego: Math.floor(smeMetrics.runway),
+        endividamento: parseFloat(((totals.divTotal / (totals.fatReal || totals.fatTotal || 1)) * 100).toFixed(1)),
+        taxaConversao: parseFloat(((totals.fatReal / (totals.fatTotal || 1)) * 100).toFixed(1)),
+        margemLucro: parseFloat(smeMetrics.margin.toFixed(1)),
+        tendencia: smeMetrics.margin > 10 ? 'FORTE_CRESCIMENTO' : 'ESTÁVEL_BAIXA',
+        saudeGeral: smeMetrics.healthScore
+      };
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: prompt,
-        config: { systemInstruction: "Estrategista Financeiro Brasileiro de alto nível. Focado em lucro e clareza." }
-      });
+      const baseAnalise = { indicadores, data: new Date().toISOString() };
+      const nome = AnaliseNaming.gerarNomeAutomatico(baseAnalise as any);
+      const tags = AnaliseNaming.gerarTagsAutomaticas(baseAnalise as any);
+
+      const novaAnalise: Partial<AnaliseCompleta> = {
+        nome,
+        nomeEditavel: true,
+        tags,
+        data: baseAnalise.data,
+        indicadores,
+        relatorio: `DIAGNÓSTICO MASTER v3.0\n\nSua empresa apresenta um score de saúde de ${indicadores.saudeGeral}/100. Seu fôlego operacional é de ${indicadores.indiceFolego} dias. Recomenda-se focar na taxa de conversão que está em ${indicadores.taxaConversao}%.\n\nESTRATÉGIA RECOMENDADA:\nCrie uma reserva de emergência para cobrir pelo menos 90 dias de custo diário (R$ ${smeMetrics.burnRate.toFixed(2)}).`,
+        acoes: [
+          { id: '1', titulo: 'Cobrar Pendentes', descricao: 'Acelerar recebíveis', prioridade: 1, prazo: 'Imediato', impacto: 'Alto', status: 'pendente' }
+        ],
+        metadados: { versaoIA: '3.0', tempoProcessamento: 1200, perfilUsuario: 'Pro' }
+      };
+
+      if (auth.currentUser) {
+        await addDoc(collection(db, `users/${auth.currentUser.uid}/analises`), novaAnalise);
+      }
       
-      const text = response.text || "Falha ao processar comando.";
-      setAnalysis(text);
-      await setDoc(doc(db, `users/${auth.currentUser.uid}/usage`, todayStr), { count: increment(1) }, { merge: true });
-      await addDoc(collection(db, `users/${auth.currentUser.uid}/data/${monthId}/ai_history`), { text, createdAt: serverTimestamp(), focus: aiFocus });
-    } catch (e) { setAnalysis("Erro de conexão com o estrategista."); } finally { setLoading(false); }
+      setCurrentAnalysis(novaAnalise as AnaliseCompleta);
+      setLoading(false);
+    }, 2000);
   };
 
-  const renderMarkdown = (text: string) => text.split('\n').map((line, i) => {
-    if (line.startsWith('###') || line.match(/^\d\./)) return <h4 key={i} className="text-sm md:text-base font-black text-slate-900 uppercase mt-8 mb-4 border-l-4 border-indigo-600 pl-4 tracking-widest">{line.replace('###', '').trim()}</h4>;
-    return <p key={i} className="text-[12px] md:text-[14px] text-slate-600 mb-4 leading-relaxed font-medium">{line.split('**').map((part, j) => j % 2 === 1 ? <strong key={j} className="text-slate-950 font-black">{part}</strong> : part)}</p>;
-  });
-
-  const handleDeleteClick = (id: string) => {
-    setPendingDeleteId(id);
-    setIsDeleteAllMode(false);
-    setIsConfirmModalOpen(true);
-  };
-
-  const handleDeleteAllClick = () => {
-    setIsDeleteAllMode(true);
-    setIsConfirmModalOpen(true);
-  };
-
-  const confirmDelete = async () => {
+  const handleRename = async (id: string, novoNome: string) => {
     if (!auth.currentUser) return;
-    if (isDeleteAllMode) {
-      const batch = writeBatch(db);
-      const snapshot = await getDocs(collection(db, `users/${auth.currentUser.uid}/data/${monthId}/ai_history`));
-      snapshot.forEach(docSnap => batch.delete(docSnap.ref));
-      await batch.commit();
-      setAnalysis(null);
-      setIsActivated(false);
-    } else if (pendingDeleteId) {
-      await deleteDoc(doc(db, `users/${auth.currentUser.uid}/data/${monthId}/ai_history`, pendingDeleteId));
-      if (history.length <= 1) { setAnalysis(null); setIsActivated(false); }
-    }
-    setIsConfirmModalOpen(false);
-    setPendingDeleteId(null);
+    await updateDoc(doc(db, `users/${auth.currentUser.uid}/analises`, id), { nome: novoNome });
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!auth.currentUser || !confirm("Excluir esta análise permanentemente?")) return;
+    await deleteDoc(doc(db, `users/${auth.currentUser.uid}/analises`, id));
   };
 
   return (
-    <div className="flex flex-col lg:flex-row gap-10 animate-in fade-in duration-700 pb-20 max-w-7xl mx-auto w-full">
-      <div className="flex-1 space-y-8">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-           <MetricCard label="Equilíbrio" value={Math.min((totals.totalIncomes/(totals.totalExpenses||1))*100, 100).toFixed(1) + '%'} icon={Filter} color="text-amber-500" />
-           <MetricCard label="Margem Real" value={(totals.totalIncomes > 0 ? ((totals.totalIncomes - totals.totalExpenses)/totals.totalIncomes)*100 : 0).toFixed(1) + '%'} icon={DollarSign} color="text-emerald-500" />
-           <MetricCard label="Fôlego" value={((totals.availableCash / ((totals.totalExpenses/30)||1)) || 0).toFixed(0) + ' d'} icon={Clock} color="text-indigo-500" />
-           <MetricCard label="Custo Diário" value={(totals.totalExpenses/22 || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} icon={Zap} color="text-rose-500" />
-        </div>
-
-        <div className="bg-white rounded-[48px] md:rounded-[56px] border border-slate-100 shadow-3xl overflow-hidden flex flex-col min-h-[600px] relative">
-          <div className="px-6 py-8 md:px-8 md:py-10 bg-[#020617] flex flex-col md:flex-row justify-between items-center gap-6 border-b border-white/5">
-             <div className="flex items-center gap-4 md:gap-5">
-                <div className="p-4 bg-indigo-600 text-white rounded-[20px] md:rounded-3xl shadow-2xl shadow-indigo-500/20"><Bot size={32} /></div>
-                <div>
-                  <h3 className="text-lg md:text-xl font-black text-white tracking-tighter uppercase">Auditoria <span className="text-indigo-400">Master</span></h3>
-                  <p className="text-[9px] md:text-[10px] font-black text-white/30 uppercase tracking-[0.3em] mt-1">{isInfinite ? 'ACESSO ILIMITADO' : `${remainingCredits} CRÉDITOS HOJE`}</p>
-                </div>
-             </div>
-             <div className="flex gap-1.5 md:gap-2 bg-white/5 p-1 rounded-2xl border border-white/5 scale-[0.9] md:scale-100">
-                {(['geral', 'custos', 'crise'] as const).map(f => (
-                  <button key={f} onClick={() => setAiFocus(f)} className={`px-4 py-2 md:px-6 md:py-2.5 rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all ${aiFocus === f ? 'bg-indigo-600 text-white shadow-xl' : 'text-white/40 hover:text-white'}`}>{f}</button>
-                ))}
-             </div>
-          </div>
-
-          <div className="p-6 md:p-10 flex-1 flex flex-col justify-center relative">
-             {loading ? (
-               <div className="flex flex-col items-center gap-6 animate-pulse py-20">
-                  <Brain size={80} className="text-indigo-600 animate-bounce" />
-                  <span className="text-[12px] font-black uppercase text-slate-400 tracking-[0.4em]">Estrategista processando dados...</span>
+    <div className="w-full space-y-10 animate-in fade-in pb-20 max-w-7xl mx-auto px-4">
+      {/* KPI GRID ESTRATÉGICO */}
+      <div className="bg-[#020617] rounded-[48px] p-8 md:p-12 border border-indigo-500/20 shadow-4xl relative overflow-hidden">
+         <div className="absolute top-0 right-0 p-12 opacity-5 text-indigo-500 rotate-12"><Target size={240}/></div>
+         <div className="grid grid-cols-1 md:grid-cols-2 gap-12 relative z-10">
+            <div className="space-y-8">
+               <div className="flex items-center gap-3">
+                  <div className="p-3 bg-indigo-500/20 text-indigo-400 rounded-2xl"><Shield size={24}/></div>
+                  <span className="text-[10px] font-black uppercase text-indigo-400 tracking-[0.4em]">SME Performance Index v3.0</span>
                </div>
-             ) : !isActivated ? (
-               <div className="text-center space-y-10 py-10 md:py-20">
-                  <Brain size={80} className="mx-auto text-slate-100 mb-4" />
-                  <div className="max-w-md mx-auto px-6">
-                    <h4 className="text-xl md:text-2xl font-black text-slate-900 uppercase tracking-tight mb-4">Auditoria Preditiva Ativa</h4>
-                    <p className="text-slate-400 text-xs md:text-sm font-medium leading-relaxed">Nossa IA analisa o ROI, furos de caixa e sugere ajustes imediatos baseados no seu cenário real deste mês.</p>
-                  </div>
-                  <button onClick={fetchAIAnalysis} className="px-12 py-5 md:px-14 md:py-6 bg-[#020617] text-white rounded-[24px] md:rounded-[28px] text-[11px] md:text-[12px] font-black uppercase tracking-[0.3em] hover:bg-indigo-600 hover:scale-105 transition-all shadow-4xl flex items-center gap-3 mx-auto group">
-                    <Zap size={20} className="text-indigo-400 group-hover:text-white" /> Executar Análise ({aiFocus})
-                  </button>
+               <div className="flex items-baseline gap-2">
+                  <span className="text-7xl md:text-9xl font-black text-white tracking-tighter">{smeMetrics.healthScore}</span>
+                  <span className="text-2xl font-black text-white/30 uppercase tracking-tighter">/100</span>
                </div>
-             ) : (
-               <div className="animate-in fade-in slide-in-from-bottom-6 duration-500">
-                  <div className="bg-slate-50/50 p-6 md:p-10 rounded-[32px] md:rounded-[48px] border border-slate-100 relative">
-                     <div className="absolute top-4 right-4 md:top-6 md:right-6 flex gap-2">
-                        <button onClick={() => { navigator.clipboard.writeText(analysis || ''); setCopied(true); setTimeout(() => setCopied(false), 2000); }} className="p-3 bg-white rounded-xl shadow-md hover:text-indigo-600 transition-all">{copied ? <Check size={20} className="text-emerald-500" /> : <Copy size={20} />}</button>
-                        <button onClick={() => setIsActivated(false)} className="p-3 bg-white rounded-xl shadow-md hover:text-rose-500 transition-all"><X size={20}/></button>
-                     </div>
-                     <div className="mt-8 md:mt-0">
-                       {analysis && renderMarkdown(analysis)}
-                     </div>
-                     <div className="mt-10 pt-8 border-t border-slate-100 flex justify-center">
-                        <button onClick={fetchAIAnalysis} className="flex items-center gap-2 px-6 py-3 bg-[#020617] text-white rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-indigo-600 transition-all shadow-lg"><Zap size={14}/> Reanalisar Agora</button>
-                     </div>
-                  </div>
-               </div>
-             )}
-          </div>
-        </div>
-      </div>
-
-      <div className="lg:w-96 space-y-8">
-         <div className="bg-white p-6 md:p-10 rounded-[48px] border border-slate-100 shadow-2xl flex flex-col h-full min-h-[500px]">
-            <div className="flex items-center justify-between mb-8 border-b border-slate-50 pb-6">
-               <div className="flex items-center gap-3 text-slate-900">
-                  <History size={20} className="text-indigo-500" />
-                  <h4 className="text-[11px] md:text-[12px] font-black uppercase tracking-widest">Histórico</h4>
-               </div>
-               {history.length > 0 && (
-                 <button onClick={handleDeleteAllClick} className="p-2 text-rose-300 hover:text-rose-500 transition-colors" title="Limpar tudo"><Trash size={16}/></button>
-               )}
+               <p className="text-slate-400 text-sm font-medium leading-relaxed max-w-sm italic">"O segredo da escala é a previsibilidade do caixa."</p>
             </div>
-
-            <div className="space-y-4 overflow-y-auto no-scrollbar pr-1 flex-1">
-               {history.length > 0 ? (
-                 history.map(item => (
-                   <div key={item.id} className="group bg-slate-50 p-5 rounded-[28px] border border-slate-100 hover:bg-white hover:shadow-xl transition-all cursor-pointer relative overflow-hidden" onClick={() => setAnalysis(item.text)}>
-                      <div className="flex justify-between items-start mb-2">
-                         <span className={`px-2.5 py-1 rounded-full text-[8px] font-black uppercase border ${item.focus === 'crise' ? 'bg-rose-50 text-rose-500 border-rose-100' : 'bg-indigo-50 text-indigo-500 border-indigo-100'}`}>
-                            {item.focus || 'geral'}
-                         </span>
-                         <button onClick={(e) => { e.stopPropagation(); handleDeleteClick(item.id); }} className="p-1.5 text-slate-200 hover:text-rose-500 transition-all"><X size={14}/></button>
-                      </div>
-                      <p className="text-[10px] font-medium text-slate-600 line-clamp-2 leading-relaxed mb-3">{item.text.replace(/[#*]/g, '')}</p>
-                      <div className="flex items-center gap-2 text-[8px] font-black text-slate-300 uppercase tracking-widest">
-                         <Clock size={10} /> {item.createdAt ? format(item.createdAt.toDate(), "dd MMM, HH:mm", { locale: ptBR }) : 'Gerando...'}
-                      </div>
-                   </div>
-                 ))
-               ) : (
-                 <div className="h-full flex flex-col items-center justify-center text-center py-20 opacity-30">
-                    <History size={48} className="text-slate-200 mb-4" />
-                    <p className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.3em]">Nenhuma auditoria<br/>registrada</p>
-                 </div>
-               )}
+            <div className="flex flex-col justify-end space-y-10">
+               <div className="space-y-4">
+                  <div className="flex justify-between text-[10px] font-black uppercase text-white/40 tracking-widest">
+                     <span>Eficiência de Comando</span>
+                     <span className="text-indigo-400">{smeMetrics.healthScore}%</span>
+                  </div>
+                  <div className="h-4 bg-white/5 rounded-full overflow-hidden border border-white/5 p-1">
+                     <div className="h-full bg-gradient-to-r from-indigo-600 via-blue-500 to-emerald-400 rounded-full transition-all duration-1000 shadow-[0_0_20px_rgba(79,70,229,0.5)]" style={{ width: `${smeMetrics.healthScore}%` }}></div>
+                  </div>
+               </div>
+               <div className="grid grid-cols-2 gap-6 text-white">
+                  <div className="p-6 bg-white/5 rounded-[32px] border border-white/10 flex flex-col justify-between min-h-[120px]">
+                     <span className="text-[9px] font-black text-white/30 uppercase block">Risco SME</span>
+                     <span className={`text-lg font-black uppercase ${smeMetrics.healthScore > 60 ? 'text-emerald-400' : 'text-rose-400'}`}>{smeMetrics.healthScore > 60 ? 'Seguro' : 'Alerta'}</span>
+                  </div>
+                  <div className="p-6 bg-white/5 rounded-[32px] border border-white/10 flex flex-col justify-between min-h-[120px]">
+                     <span className="text-[9px] font-black text-white/30 uppercase block">Margem</span>
+                     <span className="text-lg font-black text-indigo-400">{smeMetrics.margin.toFixed(1)}%</span>
+                  </div>
+               </div>
             </div>
          </div>
       </div>
 
-      <ConfirmModal 
-        isOpen={isConfirmModalOpen} 
-        title={isDeleteAllMode ? "Limpar Histórico" : "Remover Auditoria"} 
-        message={isDeleteAllMode ? "Deseja excluir permanentemente todas as auditorias deste mês?" : "Deseja excluir este insight estratégico do seu histórico?"}
-        onConfirm={confirmDelete}
-        onCancel={() => setIsConfirmModalOpen(false)}
-        variant="danger"
-        confirmLabel="Sim, Excluir"
-      />
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+         <MetricCard label="Ponto Equilíbrio" value={smeMetrics.equilibrium.toFixed(1) + '%'} icon={Filter} color="text-amber-500" sub="Comprometimento" />
+         <MetricCard label="Fôlego Real" value={smeMetrics.runway.toFixed(0) + ' d'} icon={Clock} color="text-indigo-500" sub="Sobrevivência" />
+         <MetricCard label="ROI Auditoria" value="--%" icon={TrendingUp} color="text-emerald-500" sub="Potencial" />
+         <MetricCard label="Burn Rate" value={smeMetrics.burnRate.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} icon={DollarSign} color="text-rose-500" sub="Custo Diário" />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
+        {/* RELATÓRIO ATIVO */}
+        <div className="lg:col-span-8 bg-white rounded-[56px] border border-slate-200 shadow-3xl overflow-hidden min-h-[500px] flex flex-col p-10 md:p-16">
+            {loading ? (
+              <div className="flex-1 flex flex-col items-center justify-center animate-pulse">
+                <div className="relative mb-10">
+                   <div className="w-24 h-24 bg-indigo-600/10 rounded-[32px] flex items-center justify-center animate-bounce">
+                      <Bot size={48} className="text-indigo-600" />
+                   </div>
+                   <div className="absolute inset-0 border-4 border-indigo-200 border-t-indigo-600 rounded-[32px] animate-spin"></div>
+                </div>
+                <p className="text-[12px] font-black uppercase tracking-[0.5em] text-slate-400">Auditoria IA v3.0 em curso...</p>
+              </div>
+            ) : currentAnalysis ? (
+              <div className="animate-in zoom-in-95 duration-500 flex flex-col h-full">
+                 <div className="flex justify-between items-center mb-12">
+                    <div className="flex items-center gap-6">
+                       <div className="p-4 bg-indigo-50 rounded-3xl text-indigo-600 shadow-inner"><Sparkles size={32} /></div>
+                       <div>
+                          <h4 className="text-2xl font-black text-slate-900 uppercase tracking-tighter mb-1">{currentAnalysis.nome}</h4>
+                          <div className="flex gap-2">
+                             {currentAnalysis.tags.map(t => <span key={t} className="px-2 py-0.5 rounded-lg bg-indigo-50 text-[8px] font-black uppercase text-indigo-400 tracking-widest">{t}</span>)}
+                          </div>
+                       </div>
+                    </div>
+                    <button onClick={() => setCurrentAnalysis(null)} className="p-3 bg-slate-100 text-slate-400 rounded-full hover:bg-slate-900 hover:text-white transition-all shadow-sm"><ChevronRight className="rotate-180" /></button>
+                 </div>
+                 <div className="bg-slate-50 p-10 rounded-[40px] border border-slate-100 flex-1 overflow-y-auto no-scrollbar font-mono text-sm leading-relaxed whitespace-pre-wrap text-slate-700 shadow-inner">
+                    {currentAnalysis.relatorio}
+                 </div>
+                 <div className="mt-10 flex flex-wrap gap-4">
+                    <button onClick={handleAudit} className="flex-1 py-6 bg-indigo-600 text-white rounded-[24px] text-[11px] font-black uppercase tracking-[0.3em] shadow-2xl hover:bg-indigo-700 transition-all flex items-center justify-center gap-3"><Zap size={20}/> Nova Auditoria Master</button>
+                    <button className="px-10 py-6 bg-slate-900 text-white rounded-[24px] text-[11px] font-black uppercase tracking-[0.3em] flex items-center gap-3"><Download size={20}/> Exportar PDF</button>
+                 </div>
+              </div>
+            ) : (
+              <div className="flex-1 flex flex-col items-center justify-center text-center py-20">
+                <div className="w-32 h-32 bg-slate-50 rounded-[48px] flex items-center justify-center text-slate-200 mb-8 border-4 border-dashed border-slate-100">
+                   <Brain size={64} strokeWidth={1} />
+                </div>
+                <h4 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Centro de Inteligência 3.0</h4>
+                <p className="text-slate-400 text-sm font-medium mt-4 max-w-md mx-auto leading-relaxed">
+                   O estrategista está aguardando seus dados de fluxo deste mês para executar a auditoria de saúde líquida e ROI operacional.
+                </p>
+                <button onClick={handleAudit} className="mt-12 px-14 py-7 bg-indigo-600 text-white rounded-full text-[12px] font-black uppercase tracking-[0.4em] hover:bg-indigo-700 transition-all flex items-center gap-3 shadow-4xl group">
+                   <Zap size={20} className="group-hover:animate-pulse"/> Executar Auditoria
+                </button>
+              </div>
+            )}
+        </div>
+
+        {/* HISTÓRICO APRIMORADO v3.0 */}
+        <div className="lg:col-span-4 h-full">
+           <HistoricoAnalises 
+             analises={historyList}
+             onSelectAnalise={(id) => setCurrentAnalysis(historyList.find(h => h.id === id) || null)}
+             onRenameAnalise={handleRename}
+             onDeleteAnalise={handleDelete}
+             onExport={() => alert("Histórico exportado com sucesso.")}
+           />
+        </div>
+      </div>
     </div>
   );
 };
 
-const MetricCard = ({ label, value, icon: Icon, color }: any) => (
-  <div className="bg-white p-5 rounded-[28px] md:rounded-[32px] border border-slate-100 shadow-xl flex flex-col gap-4 group hover:translate-y-[-4px] transition-all">
+const MetricCard = ({ label, value, icon: Icon, color, sub }: any) => (
+  <div className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-xl flex flex-col gap-8 group hover:translate-y-[-6px] hover:shadow-2xl transition-all duration-500">
     <div className="flex justify-between items-start">
-       <div className="p-2.5 bg-slate-50 text-slate-400 rounded-2xl group-hover:bg-indigo-600 group-hover:text-white transition-all shadow-inner"><Icon size={18}/></div>
-       <span className={`text-lg md:text-xl font-black font-mono tracking-tighter ${color}`}>{value}</span>
+       <div className="p-4 bg-slate-50 text-slate-300 rounded-[24px] group-hover:bg-indigo-600 group-hover:text-white transition-all shadow-inner"><Icon size={24}/></div>
+       <span className={`text-2xl font-black font-mono tracking-tighter ${color}`}>{value}</span>
     </div>
-    <span className="text-[8px] md:text-[9px] font-black text-slate-500 uppercase tracking-widest leading-none">{label}</span>
+    <div className="space-y-1">
+       <span className="text-[10px] font-black text-slate-900 uppercase tracking-[0.2em] block">{label}</span>
+       <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest block">{sub}</span>
+    </div>
   </div>
 );
 

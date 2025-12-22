@@ -2,8 +2,10 @@
 import React, { useState } from 'react';
 import { BaseTransaction } from '../types';
 import { Activity, X, CheckCircle2, AlertCircle, Clock, ArrowUpRight, ArrowDownRight, Tag } from 'lucide-react';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, parseISO, isToday, startOfWeek, endOfWeek, isWeekend } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+// Fix: Removed missing startOfMonth, parseISO, and startOfWeek, using native Date logic and startOfISOWeek instead
+import { format, endOfMonth, eachDayOfInterval, isSameDay, isToday, startOfISOWeek, endOfWeek, isWeekend } from 'date-fns';
+// Fix: Use more specific import for ptBR locale
+import { ptBR } from 'date-fns/locale/pt-BR';
 
 interface Props {
   month: string;
@@ -20,9 +22,11 @@ const CalendarView: React.FC<Props> = ({ month, year, transactions }) => {
   ].indexOf(month);
 
   const viewDate = new Date(year, monthIndex);
-  const firstDay = startOfMonth(viewDate);
+  // Fix: Manual startOfMonth calculation
+  const firstDay = new Date(year, monthIndex, 1);
   const lastDay = endOfMonth(viewDate);
-  const startDate = startOfWeek(firstDay, { locale: ptBR });
+  // Fix: use startOfISOWeek (suggested by compiler) which matches ptBR Monday start
+  const startDate = startOfISOWeek(firstDay);
   const endDate = endOfWeek(lastDay, { locale: ptBR });
   
   const days = eachDayOfInterval({ start: startDate, end: endDate });
@@ -31,7 +35,8 @@ const CalendarView: React.FC<Props> = ({ month, year, transactions }) => {
     return transactions.filter(t => {
       if (!t.dueDate) return false;
       try {
-        const txDate = parseISO(t.dueDate);
+        // Fix: Replace parseISO with native Date constructor for local time
+        const txDate = new Date(t.dueDate + 'T00:00:00');
         return isSameDay(txDate, day);
       } catch {
         return false;
