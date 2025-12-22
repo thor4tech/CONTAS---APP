@@ -33,9 +33,9 @@ const SplitTransactionView: React.FC<Props> = ({ transactions, categories, partn
   };
 
   return (
-    <div className="space-y-6 md:space-y-10 animate-in fade-in duration-500 w-full max-w-full">
+    <div className="space-y-12 animate-in fade-in duration-500 w-full max-w-full">
       <div className="flex justify-center sticky top-[150px] md:top-[160px] z-[85]">
-        <div className="flex p-1 bg-white/90 border border-slate-200 rounded-full shadow-2xl backdrop-blur-xl w-full max-w-[320px] md:max-w-sm">
+        <div className="flex p-1 bg-white/90 border border-slate-200 rounded-full shadow-2xl backdrop-blur-xl w-full max-w-[340px] md:max-w-md">
            <button 
              onClick={() => setActiveView('income')} 
              className={`flex-1 px-4 py-2.5 md:py-3 text-[9px] md:text-[10px] font-black uppercase tracking-widest rounded-full transition-all ${activeView === 'income' ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-50'}`}
@@ -44,7 +44,7 @@ const SplitTransactionView: React.FC<Props> = ({ transactions, categories, partn
            </button>
            <button 
              onClick={() => setActiveView('both')} 
-             className={`hidden sm:flex flex-1 items-center justify-center px-4 py-3 text-[10px] font-black uppercase tracking-widest rounded-full transition-all ${activeView === 'both' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-50'}`}
+             className={`flex flex-1 items-center justify-center px-4 py-3 text-[9px] md:text-[10px] font-black uppercase tracking-widest rounded-full transition-all ${activeView === 'both' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-50'}`}
            >
              Ambos
            </button>
@@ -57,7 +57,7 @@ const SplitTransactionView: React.FC<Props> = ({ transactions, categories, partn
         </div>
       </div>
 
-      <div className={`grid grid-cols-1 ${activeView === 'both' ? 'xl:grid-cols-2' : 'grid-cols-1'} gap-8 xl:gap-10 w-full`}>
+      <div className="grid grid-cols-1 gap-12 w-full">
         <div className={`w-full transition-all duration-500 ${activeView === 'expense' ? 'hidden' : 'block'}`}>
           <TransactionTable 
             showValues={showValues}
