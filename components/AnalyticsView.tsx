@@ -7,7 +7,7 @@ import { GoogleGenAI } from "@google/genai";
 import { AnaliseNaming } from './IA/AnaliseNaming';
 import { HistoricoAnalises } from './IA/HistoricoAnalises';
 import { FloatingInfo } from './FloatingInfo';
-import { Bot, Zap, Clock, Shield, DollarSign, Filter, TrendingUp, Brain, Download, ChevronRight, Sparkles, Trash2, Info } from 'lucide-react';
+import { Bot, Zap, Clock, Shield, DollarSign, Filter, TrendingUp, Brain, Download, ChevronRight, Sparkles, Trash2, Info, Lock, Crown } from 'lucide-react';
 
 interface Props {
   monthData: FinancialData;
@@ -54,20 +54,51 @@ const AnalyticsView: React.FC<Props> = ({ monthData, totals, userProfile }) => {
   const [currentAnalysis, setCurrentAnalysis] = useState<AnaliseCompleta | null>(null);
   const [historyList, setHistoryList] = useState<AnaliseCompleta[]>([]);
 
-  const UNLIMITED_EMAILS = ['thor4tech@gmail.com', 'cleitontadeu10@gmail.com'];
+  // Verificação de segurança para o e-mail
+  const userEmail = userProfile?.email ? userProfile.email.toLowerCase() : '';
+  const planId = userProfile?.planId || 'ESSENTIAL';
   
-  // Safe access to email with fallback to empty string to prevent toLowerCase error
-  const userEmail = (userProfile?.email || '').toLowerCase();
-  const isUnlimited = UNLIMITED_EMAILS.includes(userEmail);
+  // Regras de Acesso
+  const isAdm = ['thor4tech@gmail.com', 'cleitontadeu10@gmail.com'].includes(userEmail);
+  const isMaster = planId === 'MASTER';
+  const isPro = planId === 'PRO';
+  const isTrial = userProfile?.subscriptionStatus === 'TRIAL';
+  
+  // Lógica de Créditos:
+  // ADM/Master: Ilimitado
+  // Pro: 3 por Mês
+  // Trial: 3 Totais (para os 7 dias)
+  const isUnlimited = isAdm || isMaster;
 
-  const dailyCredits = useMemo(() => {
-    if (isUnlimited) return Infinity;
-    const today = new Date().toISOString().split('T')[0];
-    if (userProfile.aiUsage?.lastDate === today) {
-      return Math.max(0, 3 - userProfile.aiUsage.count);
+  const creditInfo = useMemo(() => {
+    if (isUnlimited) return { type: 'unlimited', remaining: Infinity };
+
+    const today = new Date();
+    const currentMonth = today.toISOString().slice(0, 7); // "YYYY-MM"
+    const lastUsageDate = userProfile.aiUsage?.lastDate || '';
+    const lastUsageCount = userProfile.aiUsage?.count || 0;
+
+    if (isTrial) {
+      // Trial: Crédito Total Fixo de 3 (independente de data)
+      // O contador incrementa e nunca reseta durante o trial
+      const limit = 3;
+      const remaining = Math.max(0, limit - lastUsageCount);
+      return { type: 'trial', remaining, limit };
     }
-    return 3;
-  }, [userProfile.aiUsage, isUnlimited]);
+
+    if (isPro) {
+      // Pro: 3 por Mês
+      const limit = 3;
+      // Se a última data de uso não for neste mês, considera 0 usados
+      const usedThisMonth = lastUsageDate.startsWith(currentMonth) ? lastUsageCount : 0;
+      const remaining = Math.max(0, limit - usedThisMonth);
+      return { type: 'monthly', remaining, limit };
+    }
+
+    // Essential ou outros status: 0 créditos
+    return { type: 'blocked', remaining: 0, limit: 0 };
+
+  }, [userProfile.aiUsage, isUnlimited, isTrial, isPro]);
 
   useEffect(() => {
     if (!auth.currentUser) return;
@@ -90,8 +121,14 @@ const AnalyticsView: React.FC<Props> = ({ monthData, totals, userProfile }) => {
   }, [totals]);
 
   const handleAudit = async () => {
-    if (dailyCredits <= 0 && !isUnlimited) {
-      alert("Créditos diários esgotados. Novos créditos amanhã!");
+    if (creditInfo.remaining <= 0 && !isUnlimited) {
+      if (creditInfo.type === 'blocked') {
+        alert("Seu plano atual não inclui IA. Faça upgrade para Pro ou Master.");
+      } else if (creditInfo.type === 'trial') {
+        alert("Você usou todos os 3 créditos do seu período de teste. Assine para continuar usando.");
+      } else {
+        alert("Limite mensal atingido. Seus créditos renovam no dia 1 do próximo mês ou faça upgrade para Master (Ilimitado).");
+      }
       return;
     }
 
@@ -126,10 +163,28 @@ const AnalyticsView: React.FC<Props> = ({ monthData, totals, userProfile }) => {
       if (auth.currentUser) {
         await addDoc(collection(db, `users/${auth.currentUser.uid}/analises`), novaAnalise);
         
-        const today = new Date().toISOString().split('T')[0];
-        const newCount = (userProfile.aiUsage?.lastDate === today ? userProfile.aiUsage.count : 0) + 1;
+        // Atualização dos Créditos
+        const today = new Date();
+        const todayStr = today.toISOString().split('T')[0];
+        const currentMonth = todayStr.slice(0, 7);
+        
+        let newCount = 1;
+        
+        if (creditInfo.type === 'trial') {
+          // Trial: Apenas incrementa o total, não importa a data
+          newCount = (userProfile.aiUsage?.count || 0) + 1;
+        } else if (creditInfo.type === 'monthly') {
+          // Pro: Verifica se mudou o mês
+          const lastDate = userProfile.aiUsage?.lastDate || '';
+          if (lastDate.startsWith(currentMonth)) {
+            newCount = (userProfile.aiUsage?.count || 0) + 1;
+          } else {
+            newCount = 1; // Novo mês, reseta para 1
+          }
+        }
+
         await updateDoc(doc(db, `users/${auth.currentUser.uid}/profile`, 'settings'), {
-          aiUsage: { lastDate: today, count: newCount }
+          aiUsage: { lastDate: todayStr, count: newCount }
         });
       }
       setCurrentAnalysis(novaAnalise as AnaliseCompleta);
@@ -144,19 +199,32 @@ const AnalyticsView: React.FC<Props> = ({ monthData, totals, userProfile }) => {
   return (
     <div className="w-full space-y-10 animate-in fade-in pb-20 max-w-7xl mx-auto px-4">
       {/* Credit Header */}
-      <div className="flex justify-center">
-         <div className="bg-[#020617] px-8 py-3 rounded-full border border-white/10 flex items-center gap-4 shadow-2xl">
-            <div className="flex items-center gap-2">
-               <Zap size={14} className="text-amber-400" fill="currentColor" />
-               <span className="text-[10px] font-black text-white uppercase tracking-widest">Créditos de IA:</span>
-            </div>
-            <span className="text-sm font-black font-mono text-amber-400">
-               {isUnlimited ? '∞ ILIMITADOS' : `${dailyCredits} RESTANTES`}
-            </span>
-            {!isUnlimited && <div className="w-px h-4 bg-white/10 mx-2" />}
-            {!isUnlimited && <span className="text-[8px] font-bold text-slate-500 uppercase">Renova em 24h</span>}
-         </div>
-      </div>
+      {!isUnlimited && (
+        <div className="flex justify-center">
+           <div className={`px-8 py-3 rounded-full border flex items-center gap-4 shadow-2xl ${creditInfo.remaining > 0 ? 'bg-[#020617] border-white/10' : 'bg-slate-200 border-slate-300'}`}>
+              <div className="flex items-center gap-2">
+                 <Zap size={14} className={creditInfo.remaining > 0 ? "text-amber-400" : "text-slate-400"} fill="currentColor" />
+                 <span className={`text-[10px] font-black uppercase tracking-widest ${creditInfo.remaining > 0 ? "text-white" : "text-slate-500"}`}>Créditos de IA:</span>
+              </div>
+              <span className={`text-sm font-black font-mono ${creditInfo.remaining > 0 ? "text-amber-400" : "text-slate-600"}`}>
+                 {creditInfo.remaining} {creditInfo.type === 'monthly' ? '/ MÊS' : 'RESTANTES'}
+              </span>
+              <div className={`w-px h-4 mx-2 ${creditInfo.remaining > 0 ? "bg-white/10" : "bg-slate-300"}`} />
+              <span className={`text-[8px] font-bold uppercase ${creditInfo.remaining > 0 ? "text-slate-500" : "text-slate-400"}`}>
+                {creditInfo.type === 'trial' ? 'Período de Teste' : 'Renova dia 1'}
+              </span>
+           </div>
+        </div>
+      )}
+
+      {isUnlimited && (
+        <div className="flex justify-center">
+           <div className="bg-indigo-600/10 px-6 py-2 rounded-full border border-indigo-600/20 flex items-center gap-2">
+              <Crown size={12} className="text-indigo-600" fill="currentColor" />
+              <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Master Intelligence Ilimitada</span>
+           </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
          <MetricCard label="Saúde Geral" value={smeMetrics.healthScore + '%'} icon={Shield} color="text-indigo-600" sub="Score Operacional" />
@@ -177,17 +245,20 @@ const AnalyticsView: React.FC<Props> = ({ monthData, totals, userProfile }) => {
 
          <button 
            onClick={handleAudit} 
-           disabled={loading || (dailyCredits <= 0 && !isUnlimited)}
+           disabled={loading || (creditInfo.remaining <= 0 && !isUnlimited)}
            className={`group relative px-16 py-8 rounded-[32px] text-lg font-black uppercase tracking-[0.3em] transition-all flex items-center gap-4 shadow-4xl
-             ${loading || (dailyCredits <= 0 && !isUnlimited) 
+             ${loading || (creditInfo.remaining <= 0 && !isUnlimited)
                ? 'bg-slate-100 text-slate-300 cursor-not-allowed' 
                : 'bg-indigo-600 text-white hover:bg-indigo-700 hover:scale-105 active:scale-95'}`}
          >
-            {loading ? <Sparkles className="animate-spin" /> : <Zap className="group-hover:animate-pulse" />}
-            {loading ? 'Consultando IA...' : 'Gerar Auditoria Master'}
-            <div className="absolute -top-3 -right-3 bg-amber-400 text-[#020617] px-3 py-1 rounded-lg text-[9px] font-black shadow-xl">
-               {isUnlimited ? '∞' : '-1 CRÉDITO'}
-            </div>
+            {loading ? <Sparkles className="animate-spin" /> : creditInfo.remaining <= 0 && !isUnlimited ? <Lock size={20} /> : <Zap className="group-hover:animate-pulse" />}
+            {loading ? 'Consultando IA...' : creditInfo.remaining <= 0 && !isUnlimited ? (creditInfo.type === 'blocked' ? 'Função Bloqueada' : 'Créditos Esgotados') : 'Gerar Auditoria Master'}
+            
+            {!isUnlimited && creditInfo.remaining > 0 && (
+              <div className="absolute -top-3 -right-3 bg-amber-400 text-[#020617] px-3 py-1 rounded-lg text-[9px] font-black shadow-xl">
+                 -1 CRÉDITO
+              </div>
+            )}
          </button>
       </div>
 
