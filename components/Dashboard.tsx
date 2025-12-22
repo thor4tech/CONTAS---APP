@@ -1,10 +1,10 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { auth, db } from '../lib/firebase';
-import { onSnapshot, doc, setDoc, query, collection } from 'firebase/firestore';
+import { onSnapshot, doc, setDoc, query, collection, updateDoc, arrayUnion } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MONTHS, DEFAULT_CATEGORIES } from '../constants';
-import { AppState, FinancialData, BaseTransaction, Category, Partner, UserProfile, AssetMetadata } from '../types';
+import { AppState, FinancialData, BaseTransaction, Category, Partner, UserProfile, AssetMetadata, Situation } from '../types';
 import SplitTransactionView from './SplitTransactionView';
 import PartnerManager from './PartnerManager';
 import CalendarView from './CalendarView';
@@ -13,6 +13,8 @@ import AnalyticsView from './AnalyticsView';
 import ReferralView from './ReferralView';
 import OnboardingWizard from './Onboarding/OnboardingWizard';
 import ConfirmModal from './ConfirmModal';
+import TransactionModal from './TransactionModal';
+import CategoryModal from './CategoryModal';
 import { FloatingInfo } from './FloatingInfo';
 import { 
   ChevronLeft, ChevronRight, LayoutDashboard, 
@@ -152,6 +154,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
   const [showValues, setShowValues] = useState(true);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isDuplicateModalOpen, setIsDuplicateModalOpen] = useState(false);
+  const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState<BaseTransaction | undefined>(undefined);
+  const [defaultTransactionType, setDefaultTransactionType] = useState<'Receita' | 'Despesa'>('Despesa');
   
   const [appState, setAppState] = useState<AppState>({
     currentMonth: MONTHS[new Date().getMonth()],
@@ -166,12 +171,34 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
     userProfile: { email: '', name: '', company: 'Minha Empresa', planId: 'PRO', subscriptionStatus: 'TRIAL', createdAt: '', trialEnd: '', globalAssets: [] }
   });
 
+  // Manipulador do botão voltar do celular/navegador
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      if (event.state?.view) {
+        setAppState(p => ({ ...p, view: event.state.view }));
+      } else {
+        setAppState(p => ({ ...p, view: 'dashboard' }));
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const setView = (newView: any) => {
+    setAppState(p => ({ ...p, view: newView }));
+    window.history.pushState({ view: newView }, '', '');
+  };
+
   useEffect(() => {
     if (!user?.uid) return;
     onSnapshot(doc(db, `users/${user.uid}/profile`, 'settings'), snap => {
       if (snap.exists()) {
         const profile = snap.data() as UserProfile;
-        setAppState(p => ({ ...p, userProfile: profile }));
+        setAppState(p => ({ 
+          ...p, 
+          userProfile: profile,
+          categories: profile.customCategories || DEFAULT_CATEGORIES 
+        }));
         if (profile.onboardingCompleto === false) setAppState(p => ({ ...p, view: 'onboarding' }));
       }
     });
@@ -252,17 +279,46 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
     await setDoc(doc(db, `users/${user.uid}/data`, currentMonthId), { ...currentMonthData, cardDetails: details }, { merge: true });
   };
 
+  const handleQuickUpdateTransaction = async (id: string, field: keyof BaseTransaction, value: any) => {
+    const txs = [...(currentMonthData.transactions || [])];
+    const idx = txs.findIndex(t => t.id === id);
+    if (idx !== -1) {
+      txs[idx] = { ...txs[idx], [field]: value };
+      await setDoc(doc(db, `users/${user.uid}/data`, currentMonthId), { ...currentMonthData, transactions: txs }, { merge: true });
+    }
+  };
+
+  const handleToggleStatus = async (id: string) => {
+    const txs = [...(currentMonthData.transactions || [])];
+    const idx = txs.findIndex(t => t.id === id);
+    if (idx !== -1) {
+      txs[idx] = { ...txs[idx], situation: txs[idx].situation === 'PAGO' ? 'PENDENTE' : 'PAGO' };
+      await setDoc(doc(db, `users/${user.uid}/data`, currentMonthId), { ...currentMonthData, transactions: txs }, { merge: true });
+    }
+  };
+
+  const handleDeleteTransaction = async (id: string) => {
+    if (!confirm("Confirmar exclusão deste lançamento?")) return;
+    const txs = (currentMonthData.transactions || []).filter(t => t.id !== id);
+    await setDoc(doc(db, `users/${user.uid}/data`, currentMonthId), { ...currentMonthData, transactions: txs }, { merge: true });
+  };
+
+  const handleSaveTransaction = async (tx: BaseTransaction) => {
+    const txs = [...(currentMonthData.transactions || [])];
+    const idx = txs.findIndex(t => t.id === tx.id);
+    if (idx !== -1) {
+      txs[idx] = tx;
+    } else {
+      txs.push(tx);
+    }
+    await setDoc(doc(db, `users/${user.uid}/data`, currentMonthId), { ...currentMonthData, transactions: txs }, { merge: true });
+  };
+
   const handleDuplicatePreviousMonth = async () => {
-    // Calcular mês anterior
     let prevIdx = MONTHS.indexOf(appState.currentMonth) - 1;
     let prevYear = appState.currentYear;
-    if (prevIdx < 0) {
-      prevIdx = 11;
-      prevYear--;
-    }
-    const prevMonthName = MONTHS[prevIdx];
+    if (prevIdx < 0) { prevIdx = 11; prevYear--; }
     const prevMonthId = `${prevYear}-${(prevIdx + 1).toString().padStart(2, '0')}`;
-    
     const prevData = appState.data.find(d => `${d.year}-${(MONTHS.indexOf(d.month) + 1).toString().padStart(2, '0')}` === prevMonthId);
     
     if (!prevData || !prevData.transactions || prevData.transactions.length === 0) {
@@ -271,43 +327,30 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
       return;
     }
 
-    // Gerar novas transações com base no mês anterior
     const newTransactions = prevData.transactions.map(t => {
-      // Ajustar data de vencimento para o mês atual preservando o dia
       let newDate = t.dueDate;
       try {
         const oldDate = new Date(t.dueDate + 'T00:00:00');
         const day = oldDate.getDate();
-        // Construir string YYYY-MM-DD
         newDate = `${appState.currentYear}-${(MONTHS.indexOf(appState.currentMonth) + 1).toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
       } catch (e) {
         newDate = new Date().toISOString().split('T')[0];
       }
-
-      return {
-        ...t,
-        id: Math.random().toString(36).substr(2, 9),
-        dueDate: newDate,
-        situation: 'PENDENTE' as const, // Resetar para pendente
-        monthRef: currentMonthId
-      };
+      return { ...t, id: Math.random().toString(36).substr(2, 9), dueDate: newDate, situation: 'PENDENTE' as Situation, monthRef: currentMonthId };
     });
 
-    // Mesclar com transações existentes no mês atual (evitar sobrescrever se o usuário já lançou algo)
-    const existingTransactions = currentMonthData.transactions || [];
-    const mergedTransactions = [...existingTransactions, ...newTransactions];
-
-    await setDoc(doc(db, `users/${user.uid}/data`, currentMonthId), { 
-      ...currentMonthData, 
-      transactions: mergedTransactions 
-    }, { merge: true });
-
+    const mergedTransactions = [...(currentMonthData.transactions || []), ...newTransactions];
+    await setDoc(doc(db, `users/${user.uid}/data`, currentMonthId), { ...currentMonthData, transactions: mergedTransactions }, { merge: true });
     setIsDuplicateModalOpen(false);
   };
 
   if (appState.view === 'onboarding') {
-    return <OnboardingWizard user={user} onFinish={() => setAppState(p => ({ ...p, view: 'dashboard' }))} />;
+    return <OnboardingWizard user={user} onFinish={() => setView('dashboard')} />;
   }
+
+  const handleSaveProfile = async (profile: any) => {
+    await setDoc(doc(db, `users/${user.uid}/profile`, 'settings'), profile);
+  };
 
   return (
     <div className="min-h-screen bg-[#f8fafc] flex flex-col w-full items-center pb-24 overflow-x-hidden">
@@ -343,7 +386,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
               { id: 'calendar', icon: Calendar, label: 'Agenda' },
               { id: 'referral', icon: Share2, label: 'Indicar' }
             ].map(tab => (
-              <button key={tab.id} onClick={() => setAppState(p => ({ ...p, view: tab.id as any }))} className={`flex items-center gap-2 px-4 md:px-6 py-3 md:py-4 rounded-full text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${appState.view === tab.id ? 'bg-[#020617] text-white shadow-xl' : 'text-slate-400 hover:bg-slate-50'}`}>
+              <button key={tab.id} onClick={() => setView(tab.id as any)} className={`flex items-center gap-2 px-4 md:px-6 py-3 md:py-4 rounded-full text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${appState.view === tab.id ? 'bg-[#020617] text-white shadow-xl' : 'text-slate-400 hover:bg-slate-50'}`}>
                 <tab.icon size={14} /> <span className="hidden sm:inline">{tab.label}</span>
               </button>
             ))}
@@ -469,11 +512,11 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                 transactions={currentMonthData.transactions} 
                 categories={appState.categories} 
                 partners={appState.partners} 
-                onToggleStatus={() => {}} 
-                onDelete={() => {}} 
-                onEdit={() => {}} 
-                onAddNew={() => {}} 
-                onQuickUpdate={() => {}} 
+                onToggleStatus={handleToggleStatus} 
+                onDelete={handleDeleteTransaction} 
+                onEdit={(tx) => { setEditingTransaction(tx); setIsTransactionModalOpen(true); }} 
+                onAddNew={(type) => { setEditingTransaction(undefined); setDefaultTransactionType(type); setIsTransactionModalOpen(true); }} 
+                onQuickUpdate={handleQuickUpdateTransaction} 
                 totals={totals} 
                 showValues={showValues}
                 onDuplicatePrevious={() => setIsDuplicateModalOpen(true)}
@@ -487,8 +530,24 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
         </AnimatePresence>
       </main>
 
-      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} userProfile={appState.userProfile} userEmail={user.email || ''} onSaveProfile={() => {}} />
+      <SettingsModal 
+        isOpen={isSettingsOpen} 
+        onClose={() => setIsSettingsOpen(false)} 
+        userProfile={appState.userProfile} 
+        userEmail={user.email || ''} 
+        onSaveProfile={handleSaveProfile} 
+      />
       
+      <TransactionModal 
+        isOpen={isTransactionModalOpen} 
+        onClose={() => setIsTransactionModalOpen(false)} 
+        onSave={handleSaveTransaction} 
+        categories={appState.categories} 
+        initialData={editingTransaction} 
+        defaultMonthRef={currentMonthId} 
+        defaultType={defaultTransactionType} 
+      />
+
       <ConfirmModal 
         isOpen={isDuplicateModalOpen}
         title="Duplicar Mês Anterior?"

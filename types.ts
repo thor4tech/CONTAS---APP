@@ -131,6 +131,11 @@ export interface UserProfile {
   trialEnd: string;
   defaultMeta?: number;
   globalAssets?: AssetMetadata[];
+  customCategories?: Category[];
+  aiUsage?: {
+    lastDate: string;
+    count: number;
+  };
   onboardingCompleto?: boolean;
   onboarding?: OnboardingData;
 }

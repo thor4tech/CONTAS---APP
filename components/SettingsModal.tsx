@@ -1,10 +1,12 @@
 
 import React, { useState, useEffect } from 'react';
-import { AssetMetadata, UserProfile, PlanId } from '../types';
-import { auth } from '../lib/firebase';
+import { AssetMetadata, UserProfile, PlanId, Category } from '../types';
+import { auth, db } from '../lib/firebase';
 import { signOut } from 'firebase/auth';
-import { X, Plus, Trash2, Save, Landmark, CreditCard, Settings, User as UserIcon, Building2, Target, Crown, ShieldCheck, Zap, ExternalLink, Star, TestTube2, CheckCircle2, AlertCircle, Loader2, LogOut } from 'lucide-react';
+import { doc, updateDoc } from 'firebase/firestore';
+import { X, Plus, Trash2, Save, Landmark, CreditCard, Settings, User as UserIcon, Building2, Target, Crown, ShieldCheck, Zap, ExternalLink, Star, TestTube2, CheckCircle2, AlertCircle, Loader2, LogOut, Palette, Hash, Edit2, LayoutGrid, CreditCard as CardIcon } from 'lucide-react';
 import { testWebhookIntegration, KIWIFY_LINKS, TEST_EMAILS } from '../lib/subscription';
+import { DEFAULT_CATEGORIES } from '../constants';
 
 interface Props {
   isOpen: boolean;
@@ -15,21 +17,22 @@ interface Props {
 }
 
 const SettingsModal: React.FC<Props> = ({ isOpen, onClose, userProfile, userEmail, onSaveProfile }) => {
-  const [activeTab, setActiveTab] = useState<'perfil' | 'ativos' | 'planos'>('perfil');
+  const [activeTab, setActiveTab] = useState<'perfil' | 'ativos' | 'classificacao' | 'planos'>('perfil');
   const [localName, setLocalName] = useState(userProfile.name);
   const [localCompany, setLocalCompany] = useState(userProfile.company);
   const [localMeta, setLocalMeta] = useState(userProfile.defaultMeta || 0);
   const [localAssets, setLocalAssets] = useState<AssetMetadata[]>(userProfile.globalAssets || []);
+  const [localCategories, setLocalCategories] = useState<Category[]>(userProfile.customCategories || DEFAULT_CATEGORIES);
   
   const [webhookTesting, setWebhookTesting] = useState<PlanId | null>(null);
   const [webhookResult, setWebhookResult] = useState<{[key in PlanId]?: 'success' | 'error'}>({});
 
-  // Emails autorizados a ver as funções de teste
-  const isTester = TEST_EMAILS.includes(userEmail.toLowerCase());
+  const isTester = TEST_EMAILS.includes((userEmail || '').toLowerCase());
 
   useEffect(() => {
     if (isOpen) {
       setLocalAssets(userProfile.globalAssets || []);
+      setLocalCategories(userProfile.customCategories || DEFAULT_CATEGORIES);
       setLocalMeta(userProfile.defaultMeta || 0);
       setLocalName(userProfile.name);
       setLocalCompany(userProfile.company);
@@ -41,36 +44,29 @@ const SettingsModal: React.FC<Props> = ({ isOpen, onClose, userProfile, userEmai
 
   const handleTestWebhook = async (plan: PlanId) => {
     setWebhookTesting(plan);
-    setWebhookResult(prev => ({ ...prev, [plan]: undefined }));
-    
     const success = await testWebhookIntegration(userEmail, plan);
-    
     if (success) {
       setWebhookResult(prev => ({ ...prev, [plan]: 'success' }));
-      
-      // Muda o plano do usuário imediatamente no sistema após o sucesso do disparo
-      onSaveProfile({
-        ...userProfile,
-        planId: plan,
-        subscriptionStatus: 'ACTIVE'
-      });
-
+      onSaveProfile({ ...userProfile, planId: plan, subscriptionStatus: 'ACTIVE' });
       setTimeout(() => setWebhookResult(prev => ({ ...prev, [plan]: undefined })), 5000);
     } else {
       setWebhookResult(prev => ({ ...prev, [plan]: 'error' }));
     }
-    
     setWebhookTesting(null);
   };
 
-  const handleAddAsset = (type: 'bank' | 'card') => {
-    const newAsset: AssetMetadata = {
+  const handleAddCategory = () => {
+    const newCat: Category = {
       id: Math.random().toString(36).substr(2, 9),
-      name: type === 'bank' ? 'Novo Banco' : 'Novo Cartão',
-      type,
-      icon: type === 'bank' ? '🏦' : '💳'
+      name: 'Nova Categoria',
+      color: 'bg-slate-100 text-slate-700',
+      icon: '📁'
     };
-    setLocalAssets([...localAssets, newAsset]);
+    setLocalCategories([...localCategories, newCat]);
+  };
+
+  const handleUpdateCategory = (id: string, updates: Partial<Category>) => {
+    setLocalCategories(localCategories.map(c => c.id === id ? { ...c, ...updates } : c));
   };
 
   const handleSaveAll = () => {
@@ -79,175 +75,224 @@ const SettingsModal: React.FC<Props> = ({ isOpen, onClose, userProfile, userEmai
       name: localName,
       company: localCompany,
       defaultMeta: localMeta,
-      globalAssets: localAssets
+      globalAssets: localAssets,
+      customCategories: localCategories
     });
     onClose();
   };
 
+  const colors = [
+    'bg-blue-100 text-blue-700', 'bg-rose-100 text-rose-700', 'bg-emerald-100 text-emerald-700',
+    'bg-amber-100 text-amber-700', 'bg-sky-100 text-sky-700', 'bg-pink-100 text-pink-700',
+    'bg-indigo-100 text-indigo-700', 'bg-slate-100 text-slate-700', 'bg-purple-100 text-purple-700',
+    'bg-orange-100 text-orange-700'
+  ];
+
+  const menuItems = [
+    { id: 'perfil', label: 'Perfil', icon: UserIcon },
+    { id: 'ativos', label: 'Bancos e Cartões', icon: CreditCard },
+    { id: 'classificacao', label: 'Classificação', icon: LayoutGrid },
+    { id: 'planos', label: 'Plano', icon: Crown },
+  ];
+
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 md:p-6 bg-slate-900/70 backdrop-blur-xl animate-in fade-in duration-300">
-      <div className="bg-white rounded-[40px] md:rounded-[56px] w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col shadow-4xl border border-white/20">
-        <div className="p-8 md:p-10 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-          <div className="flex items-center gap-4 md:gap-5">
-            <div className="p-3 md:p-4 bg-indigo-600 text-white rounded-[20px] md:rounded-[24px] shadow-2xl">
-              <Settings size={28} />
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-0 md:p-6 bg-slate-900/70 backdrop-blur-xl animate-in fade-in duration-300">
+      <div className="bg-white md:rounded-[48px] w-full max-w-5xl h-full md:h-[85vh] overflow-hidden flex flex-col md:flex-row shadow-4xl border border-white/20">
+        
+        {/* Sidebar Navigation (Desktop) / Topbar (Mobile) */}
+        <div className="bg-slate-50 border-b md:border-b-0 md:border-r border-slate-200 md:w-72 flex flex-col">
+          <div className="p-6 md:p-10 flex justify-between items-center md:block">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-indigo-600 text-white rounded-xl shadow-lg">
+                <Settings size={20} />
+              </div>
+              <span className="text-sm font-black text-slate-900 uppercase tracking-widest hidden md:inline-block">Configurações</span>
             </div>
-            <div>
-              <h3 className="text-xl md:text-2xl font-black text-slate-900 tracking-tighter">Configurações</h3>
-              <p className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mt-1">Identidade e Gestão</p>
-            </div>
+            <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full md:hidden text-slate-400"><X size={24}/></button>
           </div>
-          <button onClick={onClose} className="p-3 hover:bg-white rounded-full transition-all text-slate-400"><X size={28} /></button>
+
+          <div className="flex md:flex-col overflow-x-auto md:overflow-visible no-scrollbar px-4 md:px-6 pb-4 md:pb-6 gap-2 md:gap-4 md:flex-1">
+            {menuItems.map(item => (
+              <button
+                key={item.id}
+                onClick={() => setActiveTab(item.id as any)}
+                className={`flex items-center gap-3 px-4 py-3 md:py-4 rounded-xl md:rounded-2xl text-[10px] md:text-[11px] font-black uppercase tracking-widest transition-all whitespace-nowrap md:w-full
+                  ${activeTab === item.id 
+                    ? 'bg-white text-indigo-600 shadow-md border border-slate-100 ring-1 ring-indigo-50' 
+                    : 'text-slate-400 hover:bg-slate-100 hover:text-slate-600'
+                  }`}
+              >
+                <item.icon size={18} className={activeTab === item.id ? 'text-indigo-500' : 'text-slate-300'} />
+                {item.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="p-6 hidden md:block">
+             <button onClick={onClose} className="w-full py-4 flex items-center justify-center gap-2 text-slate-400 hover:text-slate-900 text-[10px] font-black uppercase tracking-widest transition-colors">
+               <X size={16}/> Fechar
+             </button>
+          </div>
         </div>
 
-        <div className="flex border-b border-slate-100 bg-white">
-           <button onClick={() => setActiveTab('perfil')} className={`flex-1 py-4 md:py-6 text-[9px] md:text-[11px] font-black uppercase tracking-[0.3em] border-b-4 transition-all ${activeTab === 'perfil' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400'}`}>Perfil</button>
-           <button onClick={() => setActiveTab('ativos')} className={`flex-1 py-4 md:py-6 text-[9px] md:text-[11px] font-black uppercase tracking-[0.3em] border-b-4 transition-all ${activeTab === 'ativos' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400'}`}>Ativos</button>
-           <button onClick={() => setActiveTab('planos')} className={`flex-1 py-4 md:py-6 text-[9px] md:text-[11px] font-black uppercase tracking-[0.3em] border-b-4 transition-all ${activeTab === 'planos' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-slate-400'}`}>Assinatura</button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-8 md:p-12 space-y-10 bg-white no-scrollbar">
-          {activeTab === 'perfil' && (
-            <div className="space-y-8 animate-in slide-in-from-left-4 duration-500">
-               <div className="space-y-4">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block px-2">Dados da Liderança</label>
-                  <div className="relative">
-                    <UserIcon size={20} className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300" />
-                    <input value={localName} onChange={e => setLocalName(e.target.value)} type="text" className="w-full bg-slate-50 border-2 border-slate-100 rounded-[24px] pl-16 pr-8 py-4 focus:border-indigo-300 outline-none font-bold text-slate-800" placeholder="Nome Completo" />
-                  </div>
-                  <div className="relative">
-                    <Building2 size={20} className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300" />
-                    <input value={localCompany} onChange={e => setLocalCompany(e.target.value)} type="text" className="w-full bg-slate-50 border-2 border-slate-100 rounded-[24px] pl-16 pr-8 py-4 focus:border-indigo-300 outline-none font-bold text-slate-800" placeholder="Empresa" />
-                  </div>
-               </div>
-               <div className="space-y-4">
-                  <label className="text-[10px] font-black text-indigo-500 uppercase tracking-widest block px-2 flex items-center gap-2"><Target size={14}/> Meta Faturamento (R$)</label>
-                  <div className="relative">
-                    <span className="absolute left-6 top-1/2 -translate-y-1/2 text-indigo-300 font-mono font-black">R$</span>
-                    <input value={localMeta || ''} onChange={e => setLocalMeta(parseFloat(e.target.value) || 0)} type="number" className="w-full bg-indigo-50 border-2 border-indigo-100 rounded-[24px] pl-16 pr-8 py-5 focus:border-indigo-500 outline-none font-black text-indigo-700 text-xl font-mono tracking-tighter" placeholder="Ex: 30000" />
-                  </div>
-               </div>
-               
-               <div className="pt-6 border-t border-slate-100">
-                 <button 
-                   onClick={() => signOut(auth)} 
-                   className="w-full py-4 flex items-center justify-center gap-3 bg-rose-50 text-rose-500 rounded-2xl hover:bg-rose-600 hover:text-white transition-all font-black text-[10px] uppercase tracking-[0.3em] border border-rose-100 shadow-sm"
-                 >
-                   <LogOut size={18} /> Encerrar Sessão
-                 </button>
-               </div>
-            </div>
-          )}
-
-          {activeTab === 'ativos' && (
-            <div className="space-y-10 animate-in slide-in-from-right-4 duration-500">
-              <section className="space-y-6">
-                <div className="flex items-center justify-between px-2">
-                  <h4 className="text-[10px] font-black text-slate-900 uppercase tracking-[0.3em] flex items-center gap-2"><Landmark size={18} className="text-indigo-500" /> Bancos</h4>
-                  <button onClick={() => handleAddAsset('bank')} className="p-2 bg-indigo-50 text-indigo-600 rounded-xl"><Plus size={20} /></button>
-                </div>
-                <div className="grid grid-cols-1 gap-3">
-                  {localAssets.filter(a => a.type === 'bank').map(asset => (
-                    <div key={asset.id} className="flex items-center gap-4 bg-slate-50 p-4 rounded-[20px] border border-slate-100">
-                       <input type="text" value={asset.name} onChange={e => setLocalAssets(localAssets.map(a => a.id === asset.id ? { ...a, name: e.target.value } : a))} className="flex-1 bg-transparent font-black text-slate-800 outline-none text-sm" />
-                       <button onClick={() => setLocalAssets(localAssets.filter(a => a.id !== asset.id))} className="p-2 text-rose-300 hover:text-rose-600"><Trash2 size={18}/></button>
-                    </div>
-                  ))}
-                </div>
-              </section>
-              <section className="space-y-6">
-                <div className="flex items-center justify-between px-2">
-                  <h4 className="text-[10px] font-black text-slate-900 uppercase tracking-[0.3em] flex items-center gap-2"><CreditCard size={18} className="text-rose-500" /> Cartões</h4>
-                  <button onClick={() => handleAddAsset('card')} className="p-2 bg-rose-50 text-rose-600 rounded-xl"><Plus size={20} /></button>
-                </div>
-                <div className="grid grid-cols-1 gap-3">
-                  {localAssets.filter(a => a.type === 'card').map(asset => (
-                    <div key={asset.id} className="flex items-center gap-4 bg-slate-50 p-4 rounded-[20px] border border-slate-100">
-                       <input type="text" value={asset.name} onChange={e => setLocalAssets(localAssets.map(a => a.id === asset.id ? { ...a, name: e.target.value } : a))} className="flex-1 bg-transparent font-black text-slate-800 outline-none text-sm" />
-                       <button onClick={() => setLocalAssets(localAssets.filter(a => a.id !== asset.id))} className="p-2 text-rose-300 hover:text-rose-600"><Trash2 size={18}/></button>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            </div>
-          )}
-
-          {activeTab === 'planos' && (
-            <div className="space-y-8 animate-in zoom-in-95 duration-500">
-               <div className="p-8 bg-slate-900 rounded-[32px] text-white flex flex-col justify-between items-start gap-6 relative overflow-hidden">
-                  <div className="relative z-10 w-full">
-                     <span className="text-[9px] font-black text-white/40 uppercase tracking-widest block mb-2">Status da Conta</span>
-                     <div className="flex items-center gap-3">
-                        {userProfile.subscriptionStatus === 'ACTIVE' ? <ShieldCheck className="text-emerald-400" /> : <Crown className="text-indigo-400" />}
-                        <h4 className="text-2xl font-black tracking-tighter uppercase">{userProfile.planId}</h4>
-                        <span className={`px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest border ${userProfile.subscriptionStatus === 'ACTIVE' ? 'bg-emerald-500/10 border-emerald-500/50 text-emerald-400' : 'bg-amber-500/10 border-amber-500/50 text-amber-400'}`}>{userProfile.subscriptionStatus === 'TRIAL' ? 'Teste Grátis' : userProfile.subscriptionStatus}</span>
-                     </div>
-                  </div>
-                  
-                  {isTester && (
-                    <div className="relative z-10 w-full p-6 bg-white/5 rounded-3xl border border-white/10">
-                      <h5 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-4 flex items-center gap-2"><TestTube2 size={14}/> Simulador de Ativação Kiwify (Modo Teste)</h5>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        {(['ESSENTIAL', 'PRO', 'MASTER'] as PlanId[]).map(plan => (
-                          <button 
-                            key={plan}
-                            onClick={() => handleTestWebhook(plan)}
-                            disabled={webhookTesting !== null}
-                            className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all ${webhookResult[plan] === 'success' ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' : webhookResult[plan] === 'error' ? 'bg-rose-500/20 border-rose-500 text-rose-400' : 'bg-white/10 border-white/20 text-white hover:bg-white/20'}`}
-                          >
-                            {webhookTesting === plan ? <Loader2 className="w-3 h-3 animate-spin" /> : webhookResult[plan] === 'success' ? <CheckCircle2 size={14} /> : webhookResult[plan] === 'error' ? <AlertCircle size={14} /> : <Zap size={14} />}
-                            {plan}
-                          </button>
-                        ))}
+        {/* Content Area */}
+        <div className="flex-1 flex flex-col bg-white h-full overflow-hidden">
+          <div className="flex-1 overflow-y-auto p-6 md:p-12 space-y-10 no-scrollbar">
+            {activeTab === 'perfil' && (
+              <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-2xl mx-auto md:mx-0">
+                 <div className="md:hidden flex items-center gap-2 mb-6 text-indigo-600">
+                    <UserIcon size={20}/> <h3 className="text-lg font-black uppercase tracking-tighter">Perfil</h3>
+                 </div>
+                 <div className="space-y-6">
+                    <div className="space-y-3">
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block px-2">Dados da Liderança</label>
+                      <div className="relative">
+                        <UserIcon size={20} className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300" />
+                        <input value={localName} onChange={e => setLocalName(e.target.value)} type="text" className="w-full bg-slate-50 border-2 border-slate-100 rounded-[24px] pl-16 pr-8 py-4 focus:border-indigo-300 outline-none font-bold text-slate-800 transition-all" placeholder="Nome Completo" />
+                      </div>
+                      <div className="relative">
+                        <Building2 size={20} className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300" />
+                        <input value={localCompany} onChange={e => setLocalCompany(e.target.value)} type="text" className="w-full bg-slate-50 border-2 border-slate-100 rounded-[24px] pl-16 pr-8 py-4 focus:border-indigo-300 outline-none font-bold text-slate-800 transition-all" placeholder="Empresa" />
                       </div>
                     </div>
-                  )}
-               </div>
+                    <div className="space-y-3">
+                      <label className="text-[10px] font-black text-indigo-500 uppercase tracking-widest block px-2 flex items-center gap-2"><Target size={14}/> Meta Faturamento (R$)</label>
+                      <div className="relative">
+                        <span className="absolute left-6 top-1/2 -translate-y-1/2 text-indigo-300 font-mono font-black">R$</span>
+                        <input value={localMeta || ''} onChange={e => setLocalMeta(parseFloat(e.target.value) || 0)} type="number" className="w-full bg-indigo-50 border-2 border-indigo-100 rounded-[24px] pl-16 pr-8 py-5 focus:border-indigo-500 outline-none font-black text-indigo-700 text-xl font-mono tracking-tighter" placeholder="Ex: 30000" />
+                      </div>
+                    </div>
+                 </div>
+                 <div className="pt-8 border-t border-slate-100"><button onClick={() => signOut(auth)} className="w-full py-4 flex items-center justify-center gap-3 bg-rose-50 text-rose-500 rounded-2xl hover:bg-rose-600 hover:text-white transition-all font-black text-[10px] uppercase tracking-[0.3em] border border-rose-100 shadow-sm"><LogOut size={18} /> Encerrar Sessão</button></div>
+              </div>
+            )}
 
-               <div className="grid grid-cols-1 gap-4">
-                  <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">Níveis de Comando</h4>
-                  
-                  <a href={KIWIFY_LINKS.ESSENTIAL} target="_blank" className="flex items-center justify-between p-6 bg-slate-50 rounded-[28px] border-2 border-transparent hover:border-indigo-600 transition-all group">
-                     <div>
-                        <span className="text-lg font-black text-slate-900 uppercase">Essencial</span>
-                        <p className="text-[9px] font-bold text-slate-400 uppercase mt-1">Sair do caos financeiro</p>
-                     </div>
-                     <div className="text-right">
-                        <span className="text-indigo-600 font-black font-mono block">R$ 39,90</span>
-                        <ExternalLink size={14} className="ml-auto text-slate-300 mt-1" />
-                     </div>
-                  </a>
+            {activeTab === 'ativos' && (
+              <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="md:hidden flex items-center gap-2 mb-6 text-indigo-600">
+                    <CreditCard size={20}/> <h3 className="text-lg font-black uppercase tracking-tighter">Ativos</h3>
+                </div>
+                <section className="space-y-4">
+                  <div className="flex items-center justify-between px-2">
+                    <h4 className="text-[10px] font-black text-slate-900 uppercase tracking-[0.3em] flex items-center gap-2"><Landmark size={18} className="text-indigo-500" /> Bancos</h4>
+                    <button onClick={() => { setLocalAssets([...localAssets, { id: Math.random().toString(36).substr(2, 9), name: 'Novo Banco', type: 'bank', icon: '🏦' }]) }} className="p-2 bg-indigo-50 text-indigo-600 rounded-xl hover:scale-105 active:scale-95 transition-all"><Plus size={20} /></button>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {localAssets.filter(a => a.type === 'bank').map(asset => (
+                      <div key={asset.id} className="flex items-center gap-4 bg-slate-50 p-4 rounded-[24px] border border-slate-100 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
+                         <input type="text" value={asset.name} onChange={e => setLocalAssets(localAssets.map(a => a.id === asset.id ? { ...a, name: e.target.value } : a))} className="flex-1 bg-transparent font-black text-slate-800 outline-none text-sm" />
+                         <button onClick={() => setLocalAssets(localAssets.filter(a => a.id !== asset.id))} className="p-2 text-rose-300 hover:text-rose-600 transition-colors"><Trash2 size={18}/></button>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+                <section className="space-y-4">
+                  <div className="flex items-center justify-between px-2">
+                    <h4 className="text-[10px] font-black text-slate-900 uppercase tracking-[0.3em] flex items-center gap-2"><CardIcon size={18} className="text-rose-500" /> Cartões</h4>
+                    <button onClick={() => { setLocalAssets([...localAssets, { id: Math.random().toString(36).substr(2, 9), name: 'Novo Cartão', type: 'card', icon: '💳' }]) }} className="p-2 bg-rose-50 text-rose-600 rounded-xl hover:scale-105 active:scale-95 transition-all"><Plus size={20} /></button>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {localAssets.filter(a => a.type === 'card').map(asset => (
+                      <div key={asset.id} className="flex items-center gap-4 bg-slate-50 p-4 rounded-[24px] border border-slate-100 focus-within:ring-2 focus-within:ring-rose-100 transition-all">
+                         <input type="text" value={asset.name} onChange={e => setLocalAssets(localAssets.map(a => a.id === asset.id ? { ...a, name: e.target.value } : a))} className="flex-1 bg-transparent font-black text-slate-800 outline-none text-sm" />
+                         <button onClick={() => setLocalAssets(localAssets.filter(a => a.id !== asset.id))} className="p-2 text-rose-300 hover:text-rose-600 transition-colors"><Trash2 size={18}/></button>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              </div>
+            )}
 
-                  <a href={KIWIFY_LINKS.PRO} target="_blank" className="flex items-center justify-between p-6 bg-slate-50 rounded-[28px] border-2 border-indigo-600 transition-all group relative">
-                     <div className="absolute top-0 right-10 -translate-y-1/2 bg-indigo-600 text-white px-3 py-1 rounded-full text-[8px] font-black tracking-widest uppercase flex items-center gap-1 shadow-xl"><Star size={10} fill="white"/> Destaque</div>
-                     <div>
-                        <span className="text-lg font-black text-slate-900 uppercase">Pro Estratégico</span>
-                        <p className="text-[9px] font-bold text-indigo-400 uppercase mt-1">IA + Auditoria + Agenda</p>
-                     </div>
-                     <div className="text-right">
-                        <span className="text-indigo-600 font-black font-mono block">R$ 69,90</span>
-                        <ExternalLink size={14} className="ml-auto text-slate-300 mt-1" />
-                     </div>
-                  </a>
+            {activeTab === 'classificacao' && (
+              <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                 <div className="flex items-center justify-between px-2 sticky top-0 bg-white/95 backdrop-blur-sm py-2 z-10">
+                    <div className="flex items-center gap-2 text-indigo-600 md:text-slate-900">
+                       <LayoutGrid size={20} className="md:hidden"/>
+                       <h4 className="text-[11px] font-black uppercase tracking-[0.3em]">Categorias</h4>
+                    </div>
+                    <button onClick={handleAddCategory} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl shadow-lg hover:scale-105 transition-all text-[10px] font-black uppercase tracking-widest"><Plus size={16}/> <span className="hidden md:inline">Nova</span></button>
+                 </div>
+                 <div className="grid grid-cols-1 gap-4 pb-20 md:pb-0">
+                    {localCategories.map(cat => (
+                      <div key={cat.id} className="bg-slate-50 p-6 rounded-[32px] border border-slate-100 space-y-6 group hover:bg-white hover:shadow-xl hover:ring-2 hover:ring-indigo-100 transition-all">
+                         <div className="flex flex-col md:flex-row gap-6 items-center">
+                            <div className="flex items-center gap-4 flex-1 w-full">
+                               <div className="relative group/icon flex-shrink-0">
+                                  <input value={cat.icon} onChange={e => handleUpdateCategory(cat.id, {icon: e.target.value})} className="w-14 h-14 bg-white border-2 border-slate-200 rounded-2xl text-center text-2xl shadow-sm outline-none cursor-pointer focus:border-indigo-400 transition-all" />
+                                  <Edit2 size={12} className="absolute -bottom-1 -right-1 p-1 bg-white border border-slate-200 rounded-full text-slate-400 opacity-0 group-hover/icon:opacity-100 pointer-events-none" />
+                               </div>
+                               <div className="flex-1">
+                                  <div className="flex items-center gap-1 mb-1 px-1">
+                                     <Hash size={10} className="text-slate-300"/>
+                                     <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Nome</span>
+                                  </div>
+                                  <input value={cat.name} onChange={e => handleUpdateCategory(cat.id, {name: e.target.value})} className="w-full bg-transparent font-black text-slate-800 text-lg outline-none border-b-2 border-transparent focus:border-indigo-500 transition-all" />
+                               </div>
+                            </div>
+                            <div className="flex-1 w-full">
+                               <div className="px-1 mb-3"><span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Cor</span></div>
+                               <div className="flex flex-wrap gap-2">
+                                  {colors.map(c => (
+                                    <button key={c} onClick={() => handleUpdateCategory(cat.id, {color: c})} className={`w-8 h-8 rounded-xl border-2 transition-all hover:scale-110 ${c.split(' ')[0]} ${cat.color === c ? 'border-indigo-600 scale-110 shadow-md ring-2 ring-offset-2 ring-indigo-100' : 'border-white'}`} />
+                                  ))}
+                               </div>
+                            </div>
+                            <button onClick={() => setLocalCategories(localCategories.filter(c => c.id !== cat.id))} className="p-4 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-2xl transition-all self-end md:self-center"><Trash2 size={20}/></button>
+                         </div>
+                      </div>
+                    ))}
+                 </div>
+              </div>
+            )}
 
-                  <a href={KIWIFY_LINKS.MASTER} target="_blank" className="flex items-center justify-between p-6 bg-slate-50 rounded-[28px] border-2 border-transparent hover:border-slate-900 transition-all group">
-                     <div>
-                        <span className="text-lg font-black text-slate-900 uppercase">Master Intelligence</span>
-                        <p className="text-[9px] font-bold text-slate-400 uppercase mt-1">IA Ilimitada + Multi-empresa</p>
-                     </div>
-                     <div className="text-right">
-                        <span className="text-slate-900 font-black font-mono block">R$ 129,90</span>
-                        <ExternalLink size={14} className="ml-auto text-slate-300 mt-1" />
-                     </div>
-                  </a>
-               </div>
-            </div>
-          )}
-        </div>
+            {activeTab === 'planos' && (
+              <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                 <div className="md:hidden flex items-center gap-2 mb-6 text-emerald-600">
+                    <Crown size={20}/> <h3 className="text-lg font-black uppercase tracking-tighter">Assinatura</h3>
+                 </div>
+                 <div className="p-8 bg-slate-900 rounded-[32px] text-white flex flex-col justify-between items-start gap-6 relative overflow-hidden shadow-2xl">
+                    <div className="relative z-10 w-full">
+                       <span className="text-[9px] font-black text-white/40 uppercase tracking-widest block mb-2">Status da Conta</span>
+                       <div className="flex items-center gap-3">
+                          {userProfile.subscriptionStatus === 'ACTIVE' ? <ShieldCheck className="text-emerald-400" /> : <Crown className="text-indigo-400" />}
+                          <h4 className="text-2xl font-black tracking-tighter uppercase">{userProfile.planId}</h4>
+                          <span className={`px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest border ${userProfile.subscriptionStatus === 'ACTIVE' ? 'bg-emerald-500/10 border-emerald-500/50 text-emerald-400' : 'bg-amber-500/10 border-amber-500/50 text-amber-400'}`}>{userProfile.subscriptionStatus === 'TRIAL' ? 'Teste Grátis' : userProfile.subscriptionStatus}</span>
+                       </div>
+                    </div>
+                    {isTester && (
+                      <div className="relative z-10 w-full p-6 bg-white/5 rounded-3xl border border-white/10">
+                        <h5 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-4 flex items-center gap-2"><TestTube2 size={14}/> Simulador de Ativação Kiwify (Modo Teste)</h5>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                          {(['ESSENTIAL', 'PRO', 'MASTER'] as PlanId[]).map(plan => (
+                            <button key={plan} onClick={() => handleTestWebhook(plan)} disabled={webhookTesting !== null} className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all ${webhookResult[plan] === 'success' ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' : webhookResult[plan] === 'error' ? 'bg-rose-500/20 border-rose-500 text-rose-400' : 'bg-white/10 border-white/20 text-white hover:bg-white/20'}`}>
+                              {webhookTesting === plan ? <Loader2 className="w-3 h-3 animate-spin" /> : webhookResult[plan] === 'success' ? <CheckCircle2 size={14} /> : webhookResult[plan] === 'error' ? <AlertCircle size={14} /> : <Zap size={14} />}
+                              {plan}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                 </div>
+                 <div className="grid grid-cols-1 gap-4">
+                    <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">Níveis de Comando</h4>
+                    <a href={KIWIFY_LINKS.ESSENTIAL} target="_blank" className="flex items-center justify-between p-6 bg-slate-50 rounded-[28px] border-2 border-transparent hover:border-indigo-600 transition-all group">
+                       <div><span className="text-lg font-black text-slate-900 uppercase">Essencial</span><p className="text-[9px] font-bold text-slate-400 uppercase mt-1">Sair do caos financeiro</p></div>
+                       <div className="text-right"><span className="text-indigo-600 font-black font-mono block">R$ 39,90</span><ExternalLink size={14} className="ml-auto text-slate-300 mt-1" /></div>
+                    </a>
+                    <a href={KIWIFY_LINKS.PRO} target="_blank" className="flex items-center justify-between p-6 bg-slate-50 rounded-[28px] border-2 border-indigo-600 transition-all group relative shadow-lg shadow-indigo-50">
+                       <div className="absolute top-0 right-10 -translate-y-1/2 bg-indigo-600 text-white px-3 py-1 rounded-full text-[8px] font-black tracking-widest uppercase flex items-center gap-1 shadow-xl"><Star size={10} fill="white"/> Destaque</div>
+                       <div><span className="text-lg font-black text-slate-900 uppercase">Pro Estratégico</span><p className="text-[9px] font-bold text-indigo-400 uppercase mt-1">IA + Auditoria + Agenda</p></div>
+                       <div className="text-right"><span className="text-indigo-600 font-black font-mono block">R$ 69,90</span><ExternalLink size={14} className="ml-auto text-slate-300 mt-1" /></div>
+                    </a>
+                 </div>
+              </div>
+            )}
+          </div>
 
-        <div className="p-8 md:p-12 bg-slate-50 border-t border-slate-100 flex gap-4 md:gap-6">
-          <button onClick={onClose} className="flex-1 py-4 md:py-6 font-black text-slate-400 uppercase text-[10px] tracking-[0.3em] hover:text-slate-600 transition-all">Cancelar</button>
-          <button onClick={handleSaveAll} className="flex-[2] py-4 md:py-6 bg-indigo-600 text-white font-black uppercase text-[10px] tracking-[0.3em] rounded-[24px] shadow-2xl flex items-center justify-center gap-3 hover:bg-indigo-700 active:scale-95 transition-all"><Save size={20}/> Salvar Alterações</button>
+          {/* Footer Action */}
+          <div className="p-6 md:p-10 bg-white border-t border-slate-100 flex gap-4 md:gap-6 sticky bottom-0 z-20">
+            <button onClick={handleSaveAll} className="w-full py-5 bg-indigo-600 text-white font-black uppercase text-[11px] tracking-[0.3em] rounded-[24px] shadow-2xl flex items-center justify-center gap-3 hover:bg-indigo-700 active:scale-95 transition-all"><Save size={20}/> Salvar Alterações</button>
+          </div>
         </div>
       </div>
     </div>

@@ -10,16 +10,36 @@ interface FloatingInfoProps {
 
 export const FloatingInfo: React.FC<FloatingInfoProps> = ({ title, text }) => {
   const [isVisible, setIsVisible] = useState(false);
-  const [coords, setCoords] = useState({ top: 0, left: 0 });
+  const [coords, setCoords] = useState({ top: 0, left: 0, arrowLeft: 50 });
   const triggerRef = useRef<HTMLButtonElement>(null);
 
   const updatePosition = () => {
     if (triggerRef.current) {
       const rect = triggerRef.current.getBoundingClientRect();
-      // Posição fixa baseada na viewport para evitar bugs de container
+      const tooltipWidth = 256; // w-64
+      const screenWidth = window.innerWidth;
+      const padding = 20;
+
+      // Cálculo do centro ideal
+      let left = rect.left + rect.width / 2;
+      
+      // Ajuste para não sair da tela (esquerda)
+      if (left - tooltipWidth / 2 < padding) {
+        left = tooltipWidth / 2 + padding;
+      }
+      
+      // Ajuste para não sair da tela (direita)
+      if (left + tooltipWidth / 2 > screenWidth - padding) {
+        left = screenWidth - padding - tooltipWidth / 2;
+      }
+
+      // Cálculo da posição da seta (em % relativa ao tooltip)
+      const arrowPos = ((rect.left + rect.width / 2 - (left - tooltipWidth / 2)) / tooltipWidth) * 100;
+
       setCoords({
         top: rect.top,
-        left: rect.left + rect.width / 2
+        left: left,
+        arrowLeft: arrowPos
       });
     }
   };
@@ -42,6 +62,7 @@ export const FloatingInfo: React.FC<FloatingInfoProps> = ({ title, text }) => {
         ref={triggerRef}
         onMouseEnter={() => setIsVisible(true)}
         onMouseLeave={() => setIsVisible(false)}
+        onClick={() => setIsVisible(!isVisible)}
         className="p-1.5 rounded-full hover:bg-slate-100 transition-colors flex-shrink-0 group/info"
         aria-label={`Informação sobre ${title}`}
       >
@@ -63,7 +84,10 @@ export const FloatingInfo: React.FC<FloatingInfoProps> = ({ title, text }) => {
             <p className="text-[11px] font-medium leading-relaxed text-slate-300">
               {text}
             </p>
-            <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[10px] border-l-transparent border-r-[10px] border-r-transparent border-t-[10px] border-t-[#0b1221]"></div>
+            <div 
+              className="absolute top-full w-0 h-0 border-l-[10px] border-l-transparent border-r-[10px] border-r-transparent border-t-[10px] border-t-[#0b1221]"
+              style={{ left: `${coords.arrowLeft}%`, transform: 'translateX(-50%)' }}
+            ></div>
           </div>
         </div>,
         document.body
