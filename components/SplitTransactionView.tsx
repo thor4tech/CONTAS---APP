@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { BaseTransaction, Category, Partner } from '../types';
 import TransactionTable from './TransactionTable';
+import { Copy } from 'lucide-react';
 
 interface Props {
   transactions: BaseTransaction[];
@@ -15,9 +16,10 @@ interface Props {
   totals: any;
   onReorder?: (newData: BaseTransaction[]) => void;
   showValues?: boolean;
+  onDuplicatePrevious?: () => void;
 }
 
-const SplitTransactionView: React.FC<Props> = ({ transactions, categories, partners, onToggleStatus, onDelete, onEdit, onAddNew, onQuickUpdate, totals, onReorder, showValues = true }) => {
+const SplitTransactionView: React.FC<Props> = ({ transactions, categories, partners, onToggleStatus, onDelete, onEdit, onAddNew, onQuickUpdate, totals, onReorder, showValues = true, onDuplicatePrevious }) => {
   const [activeView, setActiveView] = useState<'both' | 'income' | 'expense'>('both');
   
   const incomes = transactions.filter(t => t.type === 'Receita');
@@ -33,8 +35,8 @@ const SplitTransactionView: React.FC<Props> = ({ transactions, categories, partn
   };
 
   return (
-    <div className="space-y-12 animate-in fade-in duration-500 w-full max-w-full">
-      <div className="flex justify-center sticky top-[150px] md:top-[160px] z-[85]">
+    <div className="space-y-12 animate-in fade-in duration-500 w-full max-w-full pb-10">
+      <div className="flex flex-col md:flex-row gap-6 justify-center items-center sticky top-[150px] md:top-[160px] z-[85]">
         <div className="flex p-1 bg-white/90 border border-slate-200 rounded-full shadow-2xl backdrop-blur-xl w-full max-w-[340px] md:max-w-md">
            <button 
              onClick={() => setActiveView('income')} 
@@ -55,6 +57,15 @@ const SplitTransactionView: React.FC<Props> = ({ transactions, categories, partn
              Saídas
            </button>
         </div>
+
+        {onDuplicatePrevious && (
+          <button 
+            onClick={onDuplicatePrevious}
+            className="flex items-center gap-3 px-6 py-3 bg-white border border-indigo-100 text-indigo-600 rounded-full text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-indigo-50 hover:scale-105 active:scale-95 transition-all"
+          >
+            <Copy size={14} /> Duplicar Anterior
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-12 w-full">

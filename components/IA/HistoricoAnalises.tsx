@@ -2,7 +2,8 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AnaliseCompleta } from '../../types';
-import { Search, Filter, Calendar, Zap, Trash2, Edit2, Check, X, ChevronRight, FileText, Download } from 'lucide-react';
+import ConfirmModal from '../ConfirmModal';
+import { Search, Calendar, Zap, Trash2, Edit2, Check, X, ChevronRight, FileText, Download } from 'lucide-react';
 
 interface HistoricoAnalisesProps {
   analises: AnaliseCompleta[];
@@ -23,6 +24,7 @@ export const HistoricoAnalises: React.FC<HistoricoAnalisesProps> = ({
   const [busca, setBusca] = useState('');
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [localNome, setLocalNome] = useState('');
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const analisesFiltradas = analises.filter(a => {
     const matchBusca = a.nome.toLowerCase().includes(busca.toLowerCase()) || 
@@ -40,6 +42,13 @@ export const HistoricoAnalises: React.FC<HistoricoAnalisesProps> = ({
   const handleSaveRename = (id: string) => {
     onRenameAnalise(id, localNome);
     setEditandoId(null);
+  };
+
+  const confirmDelete = () => {
+    if (deleteId) {
+      onDeleteAnalise(deleteId);
+      setDeleteId(null);
+    }
   };
 
   const getStatusClass = (score: number) => {
@@ -141,7 +150,7 @@ export const HistoricoAnalises: React.FC<HistoricoAnalisesProps> = ({
 
               <div className="flex flex-col gap-2">
                  <button 
-                  onClick={e => { e.stopPropagation(); onDeleteAnalise(analise.id); }}
+                  onClick={e => { e.stopPropagation(); setDeleteId(analise.id); }}
                   className="p-3 bg-rose-50 text-rose-300 hover:bg-rose-600 hover:text-white rounded-2xl transition-all shadow-sm group-hover:shadow-lg"
                  >
                    <Trash2 size={16} />
@@ -171,6 +180,17 @@ export const HistoricoAnalises: React.FC<HistoricoAnalisesProps> = ({
           <Download size={14}/> Exportar Banco
         </button>
       </div>
+
+      <ConfirmModal 
+        isOpen={deleteId !== null}
+        title="Excluir Auditoria?"
+        message="Esta ação é permanente. Todos os diagnósticos e táticas gerados para este período serão perdidos."
+        confirmLabel="Sim, Excluir"
+        cancelLabel="Manter"
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteId(null)}
+        variant="danger"
+      />
     </div>
   );
 };
