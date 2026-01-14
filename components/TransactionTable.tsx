@@ -1,9 +1,9 @@
 
 import React, { useState, useMemo } from 'react';
 import { BaseTransaction, Category, Partner } from '../types';
-import { Trash2, Plus, Edit3, Activity, TrendingUp, TrendingDown, GripVertical, Search, ArrowUpDown } from 'lucide-react';
+import { Trash2, Plus, Edit3, Activity, TrendingUp, TrendingDown, GripVertical, Search, ArrowUpDown, Layers, AlertCircle, CalendarClock, CheckCircle2 } from 'lucide-react';
 import { FloatingInfo } from './FloatingInfo';
-import { format } from 'date-fns';
+import { format, isBefore, isSameDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale/pt-BR';
 
 interface Props {
@@ -32,7 +32,7 @@ const TransactionTable: React.FC<Props> = ({ title, color, data, categories, par
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
 
-  const getCategory = (id: string) => categories.find(c => c.id === id) || categories[0] || { name: 'S/ Cat', color: 'bg-slate-100 text-slate-400', icon: '❓' };
+  const getCategory = (id: string) => categories.find(c => c.id === id) || categories[0] || { name: 'S/ Cat', color: 'bg-slate-100 text-slate-700', icon: '❓' };
   
   const formatDateLabel = (dateStr: string) => { 
     try { 
@@ -83,6 +83,20 @@ const TransactionTable: React.FC<Props> = ({ title, color, data, categories, par
   };
 
   const formatValue = (v: number) => showValues ? v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'R$ ••••••';
+
+  // Helper para verificar atraso
+  const checkStatus = (item: BaseTransaction) => {
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    const dueDate = new Date(item.dueDate + 'T00:00:00');
+    
+    const isPaid = item.situation === 'PAGO';
+    const isOverdue = !isPaid && isBefore(dueDate, today);
+    const isScheduled = item.situation === 'AGENDADO';
+    const isToday = isSameDay(dueDate, today);
+
+    return { isPaid, isOverdue, isScheduled, isToday };
+  };
 
   return (
     <div className="bg-white rounded-[56px] shadow-4xl border border-slate-200 overflow-hidden flex flex-col h-full transition-all hover:shadow-5xl">
@@ -137,13 +151,28 @@ const TransactionTable: React.FC<Props> = ({ title, color, data, categories, par
           <tbody className="divide-y divide-slate-50">
             {filteredAndSortedData.map((item) => {
               const cat = getCategory(item.categoryId);
+              const { isPaid, isOverdue, isScheduled, isToday } = checkStatus(item);
+              
               return (
-                <tr key={item.id} className="group hover:bg-indigo-50/20 transition-all cursor-default">
+                <tr key={item.id} className={`group transition-all cursor-default ${isOverdue ? 'bg-rose-50/30' : isScheduled ? 'opacity-70' : 'hover:bg-indigo-50/20'}`}>
                   <td className="px-8 py-6 text-slate-200 group-hover:text-indigo-400 transition-colors"><GripVertical size={16} /></td>
-                  <td className="px-8 py-6 text-[11px] font-black text-slate-500 font-mono tracking-tighter">{formatDateLabel(item.dueDate)}</td>
                   <td className="px-8 py-6">
-                    <div className="text-[12px] font-black text-slate-900 truncate max-w-[200px] uppercase tracking-tight group-hover:text-indigo-600 transition-colors" title="Clique para editar detalhes" onClick={() => onEdit(item)}>
-                      {item.description}
+                     <div className={`flex items-center gap-2 text-[11px] font-black font-mono tracking-tighter ${isOverdue ? 'text-rose-500' : 'text-slate-500'}`}>
+                        {formatDateLabel(item.dueDate)}
+                        {isOverdue && <AlertCircle size={12} className="animate-pulse" />}
+                        {isScheduled && <CalendarClock size={12} className="text-slate-400" />}
+                     </div>
+                  </td>
+                  <td className="px-8 py-6">
+                    <div className="flex items-center gap-2">
+                       <div className={`text-[12px] font-black truncate max-w-[200px] uppercase tracking-tight group-hover:text-indigo-600 transition-colors ${isPaid ? 'text-slate-900 line-through decoration-slate-300 decoration-2' : 'text-slate-900'}`} title="Clique para editar detalhes" onClick={() => onEdit(item)}>
+                         {item.description}
+                       </div>
+                       {item.isSplit && (
+                          <div className="p-1 bg-indigo-50 text-indigo-500 rounded-md" title={`${item.splitItems?.length} itens detalhados`}>
+                             <Layers size={10} />
+                          </div>
+                       )}
                     </div>
                     <div className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-widest mt-2 border ${cat.color.replace('text-', 'border-').replace('700', '200')} ${cat.color.replace('text-', 'bg-').replace('700', '50')} ${cat.color}`}>
                       {cat.icon} {cat.name}
@@ -155,7 +184,7 @@ const TransactionTable: React.FC<Props> = ({ title, color, data, categories, par
                     ) : (
                       <div 
                         onClick={() => { setEditingValueId(item.id); setLocalVal(item.value.toString()); }} 
-                        className={`text-[13px] font-black font-mono tracking-tighter cursor-pointer px-3 py-1.5 rounded-xl border border-transparent hover:border-indigo-100 hover:bg-white hover:shadow-sm transition-all flex items-center gap-2 group/value ${item.type === 'Receita' ? 'text-emerald-600' : 'text-slate-900'}`}
+                        className={`text-[13px] font-black font-mono tracking-tighter cursor-pointer px-3 py-1.5 rounded-xl border border-transparent hover:border-indigo-100 hover:bg-white hover:shadow-sm transition-all flex items-center gap-2 group/value ${isPaid ? 'text-slate-400' : item.type === 'Receita' ? 'text-emerald-600' : 'text-slate-900'}`}
                       >
                         {formatValue(item.value || 0)}
                         <Edit3 size={10} className="opacity-0 group-hover/value:opacity-40 transition-opacity" />
@@ -163,8 +192,17 @@ const TransactionTable: React.FC<Props> = ({ title, color, data, categories, par
                     )}
                   </td>
                   <td className="px-8 py-6 text-center">
-                    <button onClick={() => onToggleStatus(item.id)} className={`px-4 py-2 rounded-full text-[9px] font-black border transition-all shadow-sm ${item.situation === 'PAGO' ? 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100' : 'bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-100'}`}>
-                      {item.situation}
+                    <button 
+                      onClick={() => onToggleStatus(item.id)} 
+                      className={`px-4 py-2 rounded-full text-[9px] font-black border transition-all shadow-sm flex items-center gap-2 mx-auto
+                        ${isPaid ? 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100' : 
+                          isOverdue ? 'bg-rose-50 text-rose-600 border-rose-200 hover:bg-rose-100' :
+                          isScheduled ? 'bg-slate-50 text-slate-400 border-slate-200 border-dashed hover:bg-slate-100' :
+                          'bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-100'}
+                      `}
+                    >
+                      {isPaid && <CheckCircle2 size={10} />}
+                      {isOverdue ? 'ATRASADO' : item.situation}
                     </button>
                   </td>
                   <td className="px-8 py-6 text-right">

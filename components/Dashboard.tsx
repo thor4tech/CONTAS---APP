@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { auth, db } from '../lib/firebase';
-import { onSnapshot, doc, setDoc, query, collection, updateDoc, arrayUnion } from 'firebase/firestore';
+import { onSnapshot, doc, setDoc, getDoc, query, collection, updateDoc, arrayUnion } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MONTHS, DEFAULT_CATEGORIES } from '../constants';
+import { MONTHS, DEFAULT_CATEGORIES, INITIAL_DATA } from '../constants';
 import { AppState, FinancialData, BaseTransaction, Category, Partner, UserProfile, AssetMetadata, Situation } from '../types';
 import SplitTransactionView from './SplitTransactionView';
 import PartnerManager from './PartnerManager';
@@ -303,15 +303,62 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
     await setDoc(doc(db, `users/${user.uid}/data`, currentMonthId), { ...currentMonthData, transactions: txs }, { merge: true });
   };
 
-  const handleSaveTransaction = async (tx: BaseTransaction) => {
-    const txs = [...(currentMonthData.transactions || [])];
-    const idx = txs.findIndex(t => t.id === tx.id);
-    if (idx !== -1) {
-      txs[idx] = tx;
-    } else {
-      txs.push(tx);
+  // Funcao inteligente de salvamento em lote para suportar parcelas em meses diferentes
+  const handleSaveTransaction = async (transactions: BaseTransaction[]) => {
+    if (transactions.length === 0) return;
+
+    // Agrupar transações por mês de competência (YYYY-MM)
+    const updatesByMonth: Record<string, BaseTransaction[]> = {};
+
+    transactions.forEach(tx => {
+       const date = new Date(tx.dueDate + 'T00:00:00');
+       const monthId = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
+       // Garantir que a monthRef esteja sincronizada com a data de vencimento
+       const txWithCorrectMonth = { ...tx, monthRef: monthId };
+
+       if (!updatesByMonth[monthId]) {
+          updatesByMonth[monthId] = [];
+       }
+       updatesByMonth[monthId].push(txWithCorrectMonth);
+    });
+
+    // Processar cada mês separadamente
+    for (const [monthId, newTxs] of Object.entries(updatesByMonth)) {
+       const docRef = doc(db, `users/${user.uid}/data`, monthId);
+       
+       // Tentar ler o documento atual (pode não estar carregado no appState se for um mês futuro)
+       // Usamos getDoc para garantir que temos a versão mais recente do banco antes de escrever
+       const docSnap = await getDoc(docRef);
+       let existingData: FinancialData;
+
+       if (docSnap.exists()) {
+          existingData = docSnap.data() as FinancialData;
+       } else {
+          // Se o mês não existe, cria com estrutura inicial
+          const [yearStr, monthNumStr] = monthId.split('-');
+          existingData = {
+             ...INITIAL_DATA,
+             year: parseInt(yearStr),
+             month: MONTHS[parseInt(monthNumStr) - 1]
+          };
+       }
+
+       // Mesclar transações
+       let updatedTransactions = [...(existingData.transactions || [])];
+       
+       newTxs.forEach(newTx => {
+          const index = updatedTransactions.findIndex(t => t.id === newTx.id);
+          if (index !== -1) {
+             // Atualizar existente
+             updatedTransactions[index] = newTx;
+          } else {
+             // Adicionar novo
+             updatedTransactions.push(newTx);
+          }
+       });
+
+       await setDoc(docRef, { ...existingData, transactions: updatedTransactions }, { merge: true });
     }
-    await setDoc(doc(db, `users/${user.uid}/data`, currentMonthId), { ...currentMonthData, transactions: txs }, { merge: true });
   };
 
   const handleDuplicatePreviousMonth = async () => {
@@ -543,6 +590,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
         onClose={() => setIsTransactionModalOpen(false)} 
         onSave={handleSaveTransaction} 
         categories={appState.categories} 
+        partners={appState.partners} // NOVA PROP PASSADA
         initialData={editingTransaction} 
         defaultMonthRef={currentMonthId} 
         defaultType={defaultTransactionType} 

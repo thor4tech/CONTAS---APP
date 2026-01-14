@@ -4,6 +4,7 @@ export type PaymentType = 'Receita' | 'Despesa';
 export type Currency = 'BRL' | 'EUR';
 export type PlanId = 'ESSENTIAL' | 'PRO' | 'MASTER';
 export type SubscriptionStatus = 'TRIAL' | 'ACTIVE' | 'EXPIRED' | 'CANCELED' | 'PENDING';
+export type TransactionFrequency = 'SINGLE' | 'INSTALLMENT' | 'RECURRING';
 
 // === PDF v3.0 ENUMS ===
 export enum SegmentoEmpresa {
@@ -98,19 +99,40 @@ export interface Partner {
   phone?: string;
 }
 
+// Sub-item de uma transação (Para o sistema de Split)
+export interface SplitItem {
+  id: string;
+  description: string;
+  value: number;
+  partnerId?: string; // Quem pagou esta parte específica
+  categoryOverride?: string; // Caso esta parte tenha categoria diferente
+}
+
 export interface BaseTransaction {
   id: string;
   description: string;
   value: number;
   categoryId: string;
-  clientSupplierId?: string;
-  dueDate: string;
+  partnerId?: string; // Vínculo principal com cliente/fornecedor
+  dueDate: string; // Data de Caixa (Previsão de cair na conta)
+  competencyDate?: string; // Data de Competência (Quando o serviço foi feito/venda realizada)
   monthRef: string;
   situation: Situation;
   type: PaymentType;
   paymentMethod: string;
-  isRecurring?: boolean;
+  
+  // Controle de Recorrência e Parcelamento
+  isRecurring?: boolean; // Mantido para compatibilidade, mas o frequency domina
+  frequency?: TransactionFrequency; 
+  installmentTotal?: number;
+  installmentNumber?: number;
+  groupId?: string; // ID para agrupar todas as parcelas de uma mesma venda
+
   attachmentUrl?: string;
+  
+  // Novo sistema de detalhamento
+  isSplit?: boolean;
+  splitItems?: SplitItem[];
 }
 
 export interface AssetMetadata {
