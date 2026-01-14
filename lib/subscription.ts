@@ -11,7 +11,7 @@ export interface AccessResult {
 }
 
 // Administradores oficiais
-export const ADMIN_EMAILS = ['thor4tech@gmail.com', 'cleitontadeu@gmail.com'];
+export const ADMIN_EMAILS = ['thor4tech@gmail.com', 'cleitontadeu@gmail.com', 'cleitontadeu10@gmail.com'];
 
 // Emails autorizados para funções de teste e simulação de webhooks
 export const TEST_EMAILS = ['thor4tech@gmail.com', 'cleitontadeu10@gmail.com', 'cleitontadeu@gmail.com'];
