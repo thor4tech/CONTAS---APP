@@ -2,9 +2,9 @@
 import React, { useState, useEffect } from 'react';
 import { AssetMetadata, UserProfile, PlanId, Category } from '../types';
 import { auth, db } from '../lib/firebase';
-import { signOut } from 'firebase/auth';
+import { signOut, updatePassword } from 'firebase/auth';
 import { doc, updateDoc } from 'firebase/firestore';
-import { X, Plus, Trash2, Save, Landmark, CreditCard, Settings, User as UserIcon, Building2, Target, Crown, ShieldCheck, Zap, ExternalLink, Star, TestTube2, CheckCircle2, AlertCircle, Loader2, LogOut, Palette, Hash, Edit2, LayoutGrid, CreditCard as CardIcon, Rocket, ArrowRight } from 'lucide-react';
+import { X, Plus, Trash2, Save, Landmark, CreditCard, Settings, User as UserIcon, Building2, Target, Crown, ShieldCheck, Zap, ExternalLink, Star, TestTube2, CheckCircle2, AlertCircle, Loader2, LogOut, Palette, Hash, Edit2, LayoutGrid, CreditCard as CardIcon, Rocket, ArrowRight, Lock } from 'lucide-react';
 import { testWebhookIntegration, KIWIFY_LINKS, TEST_EMAILS } from '../lib/subscription';
 import { DEFAULT_CATEGORIES } from '../constants';
 
@@ -17,12 +17,17 @@ interface Props {
 }
 
 const SettingsModal: React.FC<Props> = ({ isOpen, onClose, userProfile, userEmail, onSaveProfile }) => {
-  const [activeTab, setActiveTab] = useState<'perfil' | 'ativos' | 'classificacao' | 'planos'>('perfil');
+  const [activeTab, setActiveTab] = useState<'perfil' | 'ativos' | 'classificacao' | 'planos' | 'seguranca'>('perfil');
   const [localName, setLocalName] = useState(userProfile.name);
   const [localCompany, setLocalCompany] = useState(userProfile.company);
   const [localMeta, setLocalMeta] = useState(userProfile.defaultMeta || 0);
   const [localAssets, setLocalAssets] = useState<AssetMetadata[]>(userProfile.globalAssets || []);
   const [localCategories, setLocalCategories] = useState<Category[]>(userProfile.customCategories || DEFAULT_CATEGORIES);
+  
+  // States para troca de senha
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passMsg, setPassMsg] = useState<{type: 'success' | 'error', text: string} | null>(null);
   
   const [webhookTesting, setWebhookTesting] = useState<PlanId | null>(null);
   const [webhookResult, setWebhookResult] = useState<{[key in PlanId]?: 'success' | 'error'}>({});
@@ -38,10 +43,40 @@ const SettingsModal: React.FC<Props> = ({ isOpen, onClose, userProfile, userEmai
       setLocalName(userProfile.name);
       setLocalCompany(userProfile.company);
       setWebhookResult({});
+      setPassMsg(null);
+      setNewPassword('');
+      setConfirmPassword('');
     }
   }, [isOpen, userProfile]);
 
   if (!isOpen) return null;
+
+  const handleChangePassword = async () => {
+    if (newPassword.length < 6) {
+        setPassMsg({ type: 'error', text: 'A senha deve ter no mínimo 6 caracteres.' });
+        return;
+    }
+    if (newPassword !== confirmPassword) {
+        setPassMsg({ type: 'error', text: 'As senhas não conferem.' });
+        return;
+    }
+    
+    if (auth.currentUser) {
+        try {
+            await updatePassword(auth.currentUser, newPassword);
+            setPassMsg({ type: 'success', text: 'Senha atualizada com sucesso! Use a nova senha no próximo login.' });
+            setNewPassword('');
+            setConfirmPassword('');
+        } catch (error: any) {
+            console.error(error);
+            if (error.code === 'auth/requires-recent-login') {
+                setPassMsg({ type: 'error', text: 'Por segurança, faça logout e login novamente antes de trocar a senha.' });
+            } else {
+                setPassMsg({ type: 'error', text: 'Erro ao atualizar senha. Tente novamente.' });
+            }
+        }
+    }
+  };
 
   const handleTestWebhook = async (plan: PlanId) => {
     setWebhookTesting(plan);
@@ -93,6 +128,7 @@ const SettingsModal: React.FC<Props> = ({ isOpen, onClose, userProfile, userEmai
     { id: 'perfil', label: 'Perfil & Meta', icon: UserIcon },
     { id: 'ativos', label: 'Bancos e Cartões', icon: CreditCard },
     { id: 'classificacao', label: 'Classificação', icon: LayoutGrid },
+    { id: 'seguranca', label: 'Segurança', icon: Lock },
     { id: 'planos', label: 'Assinatura', icon: Crown },
   ];
 
@@ -166,6 +202,57 @@ const SettingsModal: React.FC<Props> = ({ isOpen, onClose, userProfile, userEmai
                  </div>
                  <div className="pt-8 border-t border-slate-100"><button onClick={() => signOut(auth)} className="w-full py-4 flex items-center justify-center gap-3 bg-rose-50 text-rose-500 rounded-2xl hover:bg-rose-600 hover:text-white transition-all font-black text-[10px] uppercase tracking-[0.3em] border border-rose-100 shadow-sm"><LogOut size={18} /> Encerrar Sessão</button></div>
               </div>
+            )}
+
+            {activeTab === 'seguranca' && (
+                <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-2xl mx-auto md:mx-0">
+                    <div className="md:hidden flex items-center gap-2 mb-6 text-indigo-600">
+                        <Lock size={20}/> <h3 className="text-lg font-black uppercase tracking-tighter">Segurança</h3>
+                    </div>
+                    <div className="bg-indigo-50 p-6 rounded-[32px] border border-indigo-100 mb-6">
+                        <h4 className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-2 flex items-center gap-2"><ShieldCheck size={14}/> Dados de Acesso</h4>
+                        <p className="text-sm text-indigo-900 font-bold">E-mail: <span className="font-mono text-slate-500 ml-2">{userEmail}</span></p>
+                    </div>
+
+                    <div className="space-y-4">
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block px-2">Alterar Senha</label>
+                        <div className="relative group">
+                            <Lock size={20} className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-indigo-500 transition-colors" />
+                            <input 
+                                value={newPassword} 
+                                onChange={e => setNewPassword(e.target.value)} 
+                                type="password" 
+                                className="w-full bg-slate-50 border-2 border-slate-100 rounded-[24px] pl-16 pr-8 py-4 focus:bg-white focus:border-indigo-300 outline-none font-bold text-slate-800 transition-all" 
+                                placeholder="Nova Senha" 
+                            />
+                        </div>
+                        <div className="relative group">
+                            <Lock size={20} className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-indigo-500 transition-colors" />
+                            <input 
+                                value={confirmPassword} 
+                                onChange={e => setConfirmPassword(e.target.value)} 
+                                type="password" 
+                                className="w-full bg-slate-50 border-2 border-slate-100 rounded-[24px] pl-16 pr-8 py-4 focus:bg-white focus:border-indigo-300 outline-none font-bold text-slate-800 transition-all" 
+                                placeholder="Confirmar Nova Senha" 
+                            />
+                        </div>
+                    </div>
+
+                    {passMsg && (
+                        <div className={`p-4 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-3 ${passMsg.type === 'success' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-rose-50 text-rose-600 border border-rose-100'}`}>
+                            {passMsg.type === 'success' ? <CheckCircle2 size={16}/> : <AlertCircle size={16}/>}
+                            {passMsg.text}
+                        </div>
+                    )}
+
+                    <button 
+                        onClick={handleChangePassword}
+                        disabled={!newPassword || !confirmPassword}
+                        className="w-full py-5 bg-slate-900 text-white font-black uppercase text-[11px] tracking-[0.3em] rounded-[24px] shadow-xl hover:bg-indigo-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        Atualizar Credencial
+                    </button>
+                </div>
             )}
 
             {activeTab === 'ativos' && (

@@ -60,15 +60,20 @@ const Login: React.FC<Props> = ({ onLogin, onBackToLanding }) => {
     setSuccessMsg(null);
 
     try {
+      // Removido actionCodeSettings para evitar erro "auth/unauthorized-continue-uri"
+      // O Firebase usará o template padrão e o domínio padrão do projeto.
       await sendPasswordResetEmail(auth, email);
-      setSuccessMsg('Link de recuperação enviado! Verifique seu e-mail (e a caixa de spam).');
+      setSuccessMsg('Link enviado! Verifique a Caixa de Entrada e o SPAM.');
     } catch (err: any) {
+      console.error("Erro no envio:", err);
       if (err.code === 'auth/user-not-found') {
         setError('E-mail não cadastrado no sistema.');
       } else if (err.code === 'auth/invalid-email') {
         setError('E-mail inválido.');
+      } else if (err.code === 'auth/unauthorized-continue-uri') {
+        setError('Domínio não autorizado no Firebase Console. Contate o suporte.');
       } else {
-        setError('Erro ao enviar e-mail. Tente novamente.');
+        setError('Erro ao enviar. Tente novamente mais tarde.');
       }
     } finally {
       setLoading(false);
@@ -265,7 +270,7 @@ const Login: React.FC<Props> = ({ onLogin, onBackToLanding }) => {
         </div>
       </div>
 
-      {/* LADO DIREITO: ADS/INDICAÇÃO */}
+      {/* LADO DIREITO: ADS/INDICAÇÃO (Mantido igual) */}
       <div className="w-full md:w-1/2 bg-[#020617] relative flex flex-col justify-center items-center p-12 lg:p-24 text-white overflow-hidden md:h-screen">
         <div className="absolute inset-0 pointer-events-none">
            <div className="absolute top-[-15%] right-[-15%] w-[700px] h-[700px] bg-blue-600/10 rounded-full blur-[180px] animate-pulse"></div>

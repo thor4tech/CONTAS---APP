@@ -569,7 +569,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                 onDuplicatePrevious={() => setIsDuplicateModalOpen(true)}
               />
             )}
-            {appState.view === 'analytics' && <AnalyticsView monthData={currentMonthData} totals={totals} userProfile={appState.userProfile} />}
+            {appState.view === 'analytics' && (
+              <AnalyticsView 
+                monthData={currentMonthData} 
+                allData={appState.data} // Passando todo o histórico para o relatório
+                totals={totals} 
+                userProfile={appState.userProfile} 
+              />
+            )}
             {appState.view === 'partners' && <PartnerManager partners={appState.partners} onAdd={() => {}} onDelete={() => {}} onUpdate={() => {}} />}
             {appState.view === 'calendar' && <CalendarView month={appState.currentMonth} year={appState.currentYear} transactions={currentMonthData.transactions} />}
             {appState.view === 'referral' && <ReferralView userProfile={appState.userProfile} />}
