@@ -1,8 +1,8 @@
 
 import React, { useState } from 'react';
 import { auth } from '../lib/firebase';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
-import { Activity, Lock, Mail, ArrowRight, Sparkles, ChevronLeft, Star, Users, CheckCircle2, Trophy, Gift, Rocket } from 'lucide-react';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
+import { Activity, Lock, Mail, ArrowRight, Sparkles, ChevronLeft, Star, Users, CheckCircle2, Trophy, KeyRound, CheckCircle } from 'lucide-react';
 
 interface Props {
   onLogin: () => void;
@@ -12,8 +12,14 @@ interface Props {
 const Login: React.FC<Props> = ({ onLogin, onBackToLanding }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  
+  // Estados de controle de fluxo
   const [isRegistering, setIsRegistering] = useState(false);
+  const [isRecovering, setIsRecovering] = useState(false);
+  
+  // Estados de feedback
   const [error, setError] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -28,9 +34,59 @@ const Login: React.FC<Props> = ({ onLogin, onBackToLanding }) => {
       }
       onLogin();
     } catch (err: any) {
-      setError('Credenciais inválidas ou erro de conexão.');
+      if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
+        setError('Credenciais incorretas.');
+      } else if (err.code === 'auth/email-already-in-use') {
+        setError('Este e-mail já está em uso.');
+      } else if (err.code === 'auth/weak-password') {
+        setError('A senha deve ter pelo menos 6 caracteres.');
+      } else {
+        setError('Erro ao conectar. Tente novamente.');
+      }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRecovery = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) {
+      setError('Digite seu e-mail para recuperar a senha.');
+      return;
+    }
+    
+    setLoading(true);
+    setError(null);
+    setSuccessMsg(null);
+
+    try {
+      await sendPasswordResetEmail(auth, email);
+      setSuccessMsg('Link de recuperação enviado! Verifique seu e-mail (e a caixa de spam).');
+    } catch (err: any) {
+      if (err.code === 'auth/user-not-found') {
+        setError('E-mail não cadastrado no sistema.');
+      } else if (err.code === 'auth/invalid-email') {
+        setError('E-mail inválido.');
+      } else {
+        setError('Erro ao enviar e-mail. Tente novamente.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggleMode = (mode: 'login' | 'register' | 'recovery') => {
+    setError(null);
+    setSuccessMsg(null);
+    if (mode === 'recovery') {
+      setIsRecovering(true);
+      setIsRegistering(false);
+    } else if (mode === 'register') {
+      setIsRegistering(true);
+      setIsRecovering(false);
+    } else {
+      setIsRegistering(false);
+      setIsRecovering(false);
     }
   };
 
@@ -64,70 +120,147 @@ const Login: React.FC<Props> = ({ onLogin, onBackToLanding }) => {
           <div className="space-y-10">
              <div className="text-center">
                 <h2 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight flex items-center justify-center gap-3">
-                  {isRegistering ? 'Criar Nova Patente' : 'Entrar no Comando'} <Sparkles size={24} className="text-blue-500" />
+                  {isRecovering ? 'Resgatar Acesso' : isRegistering ? 'Criar Nova Patente' : 'Entrar no Comando'} 
+                  {!isRecovering && <Sparkles size={24} className="text-blue-500" />}
+                  {isRecovering && <KeyRound size={24} className="text-amber-500" />}
                 </h2>
                 <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-3 leading-relaxed">
-                  Controle absoluto e lucratividade máxima.
+                  {isRecovering 
+                    ? 'Informe seu e-mail para redefinir sua credencial.' 
+                    : 'Controle absoluto e lucratividade máxima.'}
                 </p>
              </div>
 
-             <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="space-y-4">
-                   <div className="relative group">
-                      <Mail className="absolute left-7 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-[#3b82f6] transition-colors" size={20} />
-                      <input 
-                        type="email" 
-                        required
-                        placeholder="Seu e-mail corporativo"
-                        className="w-full bg-slate-50 border-2 border-slate-100 rounded-[28px] pl-16 pr-8 py-5 md:py-6 focus:ring-4 focus:ring-blue-50 focus:bg-white focus:border-blue-200 transition-all outline-none font-bold text-slate-700 placeholder:text-slate-300 text-base md:text-lg shadow-sm"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                      />
-                   </div>
-
-                   <div className="relative group">
-                      <Lock className="absolute left-7 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-[#3b82f6] transition-colors" size={20} />
-                      <input 
-                        type="password" 
-                        required
-                        placeholder="Sua senha de comando"
-                        className="w-full bg-slate-50 border-2 border-slate-100 rounded-[28px] pl-16 pr-8 py-5 md:py-6 focus:ring-4 focus:ring-blue-50 focus:bg-white focus:border-blue-200 transition-all outline-none font-bold text-slate-700 placeholder:text-slate-300 text-base md:text-lg shadow-sm"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                      />
-                   </div>
-                </div>
-
-                {error && (
-                  <div className="p-5 bg-rose-50 text-rose-600 rounded-[22px] text-[10px] font-black uppercase tracking-widest text-center border border-rose-100">
-                    {error}
+             {/* Formulário de Login / Registro / Recuperação */}
+             {isRecovering ? (
+               // === TELA DE RECUPERAÇÃO ===
+               <form onSubmit={handleRecovery} className="space-y-6">
+                  <div className="space-y-4">
+                     <div className="relative group">
+                        <Mail className="absolute left-7 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-amber-500 transition-colors" size={20} />
+                        <input 
+                          type="email" 
+                          required
+                          placeholder="Seu e-mail cadastrado"
+                          className="w-full bg-slate-50 border-2 border-slate-100 rounded-[28px] pl-16 pr-8 py-5 md:py-6 focus:ring-4 focus:ring-amber-50 focus:bg-white focus:border-amber-200 transition-all outline-none font-bold text-slate-700 placeholder:text-slate-300 text-base md:text-lg shadow-sm"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                        />
+                     </div>
                   </div>
-                )}
 
-                <button 
-                  type="submit" 
-                  disabled={loading}
-                  className="w-full py-6 md:py-7 bg-[#020617] hover:bg-[#3b82f6] text-white rounded-[28px] text-[13px] font-black uppercase tracking-[0.3em] transition-all flex items-center justify-center gap-4 group active:scale-95 shadow-2xl"
-                >
-                  {loading ? (
-                    <div className="w-6 h-6 border-3 border-white/30 border-t-white rounded-full animate-spin"></div>
-                  ) : (
-                    <>
-                      {isRegistering ? 'Solicitar Patente' : 'Acessar Comando'}
-                      <ArrowRight size={22} className="group-hover:translate-x-2 transition-transform" />
-                    </>
+                  {error && (
+                    <div className="p-5 bg-rose-50 text-rose-600 rounded-[22px] text-[10px] font-black uppercase tracking-widest text-center border border-rose-100 flex items-center justify-center gap-2">
+                      <span className="block w-2 h-2 bg-rose-500 rounded-full animate-pulse"></span> {error}
+                    </div>
                   )}
-                </button>
-             </form>
 
-             <div className="pt-10 border-t border-slate-100 text-center">
-                <button 
-                  onClick={() => setIsRegistering(!isRegistering)}
-                  className="px-8 py-3 rounded-full text-[10px] md:text-[11px] font-black text-slate-400 hover:text-[#3b82f6] hover:bg-slate-50 transition-all uppercase tracking-[0.2em]"
-                >
-                  {isRegistering ? 'Já possui comando? Entrar' : 'Não tem conta? Testar Grátis'}
-                </button>
-             </div>
+                  {successMsg && (
+                    <div className="p-5 bg-emerald-50 text-emerald-600 rounded-[22px] text-[10px] font-black uppercase tracking-widest text-center border border-emerald-100 flex items-center justify-center gap-2">
+                      <CheckCircle size={16} /> {successMsg}
+                    </div>
+                  )}
+
+                  <button 
+                    type="submit" 
+                    disabled={loading || !!successMsg}
+                    className="w-full py-6 md:py-7 bg-[#020617] hover:bg-amber-600 text-white rounded-[28px] text-[13px] font-black uppercase tracking-[0.3em] transition-all flex items-center justify-center gap-4 group active:scale-95 shadow-2xl disabled:opacity-70 disabled:cursor-not-allowed"
+                  >
+                    {loading ? (
+                      <div className="w-6 h-6 border-3 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    ) : (
+                      <>
+                        Enviar Link de Resgate
+                        <ArrowRight size={22} className="group-hover:translate-x-2 transition-transform" />
+                      </>
+                    )}
+                  </button>
+
+                  <div className="pt-4 text-center">
+                    <button 
+                      type="button"
+                      onClick={() => toggleMode('login')}
+                      className="text-[10px] font-black text-slate-400 hover:text-slate-600 uppercase tracking-[0.2em] transition-colors"
+                    >
+                      Voltar para Login
+                    </button>
+                  </div>
+               </form>
+             ) : (
+               // === TELA DE LOGIN / REGISTRO ===
+               <form onSubmit={handleSubmit} className="space-y-6">
+                  <div className="space-y-4">
+                     <div className="relative group">
+                        <Mail className="absolute left-7 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-[#3b82f6] transition-colors" size={20} />
+                        <input 
+                          type="email" 
+                          required
+                          placeholder="Seu e-mail corporativo"
+                          className="w-full bg-slate-50 border-2 border-slate-100 rounded-[28px] pl-16 pr-8 py-5 md:py-6 focus:ring-4 focus:ring-blue-50 focus:bg-white focus:border-blue-200 transition-all outline-none font-bold text-slate-700 placeholder:text-slate-300 text-base md:text-lg shadow-sm"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                        />
+                     </div>
+
+                     <div className="space-y-2">
+                       <div className="relative group">
+                          <Lock className="absolute left-7 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-[#3b82f6] transition-colors" size={20} />
+                          <input 
+                            type="password" 
+                            required
+                            placeholder="Sua senha de comando"
+                            className="w-full bg-slate-50 border-2 border-slate-100 rounded-[28px] pl-16 pr-8 py-5 md:py-6 focus:ring-4 focus:ring-blue-50 focus:bg-white focus:border-blue-200 transition-all outline-none font-bold text-slate-700 placeholder:text-slate-300 text-base md:text-lg shadow-sm"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                          />
+                       </div>
+                       {!isRegistering && (
+                         <div className="text-right px-4">
+                           <button 
+                             type="button"
+                             onClick={() => toggleMode('recovery')}
+                             className="text-[10px] font-black text-slate-400 hover:text-[#3b82f6] uppercase tracking-widest transition-colors"
+                           >
+                             Esqueceu a senha?
+                           </button>
+                         </div>
+                       )}
+                     </div>
+                  </div>
+
+                  {error && (
+                    <div className="p-5 bg-rose-50 text-rose-600 rounded-[22px] text-[10px] font-black uppercase tracking-widest text-center border border-rose-100 flex items-center justify-center gap-2">
+                      <span className="block w-2 h-2 bg-rose-500 rounded-full animate-pulse"></span> {error}
+                    </div>
+                  )}
+
+                  <button 
+                    type="submit" 
+                    disabled={loading}
+                    className="w-full py-6 md:py-7 bg-[#020617] hover:bg-[#3b82f6] text-white rounded-[28px] text-[13px] font-black uppercase tracking-[0.3em] transition-all flex items-center justify-center gap-4 group active:scale-95 shadow-2xl"
+                  >
+                    {loading ? (
+                      <div className="w-6 h-6 border-3 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    ) : (
+                      <>
+                        {isRegistering ? 'Solicitar Patente' : 'Acessar Comando'}
+                        <ArrowRight size={22} className="group-hover:translate-x-2 transition-transform" />
+                      </>
+                    )}
+                  </button>
+               </form>
+             )}
+
+             {!isRecovering && (
+               <div className="pt-10 border-t border-slate-100 text-center">
+                  <button 
+                    onClick={() => toggleMode(isRegistering ? 'login' : 'register')}
+                    className="px-8 py-3 rounded-full text-[10px] md:text-[11px] font-black text-slate-400 hover:text-[#3b82f6] hover:bg-slate-50 transition-all uppercase tracking-[0.2em]"
+                  >
+                    {isRegistering ? 'Já possui comando? Entrar' : 'Não tem conta? Testar Grátis'}
+                  </button>
+               </div>
+             )}
           </div>
         </div>
       </div>
