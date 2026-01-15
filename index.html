@@ -43,6 +43,18 @@
       .rounded-3xl { border-radius: 24px; }
       .rounded-4xl { border-radius: 32px; }
 
+      /* REMOVE SETINHAS DE INPUT NUMBER */
+      /* Chrome, Safari, Edge, Opera */
+      input::-webkit-outer-spin-button,
+      input::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+      }
+      /* Firefox */
+      input[type=number] {
+        -moz-appearance: textfield;
+      }
+
       /* Suporte a mobile devices */
       @media (max-width: 640px) {
         .mobile-pill-menu { bottom: 20px; left: 10px; right: 10px; }

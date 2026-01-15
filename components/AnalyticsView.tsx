@@ -7,11 +7,11 @@ import { GoogleGenAI } from "@google/genai";
 import { AnaliseNaming } from './IA/AnaliseNaming';
 import { HistoricoAnalises } from './IA/HistoricoAnalises';
 import { FloatingInfo } from './FloatingInfo';
-import { Bot, Zap, Clock, Shield, DollarSign, Filter, TrendingUp, Brain, Download, ChevronRight, Sparkles, Trash2, Info, Lock, Crown, PieChart, BarChart3, ChevronDown, ChevronUp, Layers, CalendarRange, Printer, TrendingDown } from 'lucide-react';
+import { Bot, Zap, Clock, Shield, DollarSign, Filter, TrendingUp, Brain, Download, ChevronRight, Sparkles, Trash2, Info, Lock, Crown, PieChart, BarChart3, ChevronDown, ChevronUp, Layers, CalendarRange, Printer, TrendingDown, CalendarDays } from 'lucide-react';
 import { DEFAULT_CATEGORIES, MONTHS } from '../constants';
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
-import { format, parseISO, isWithinInterval, startOfMonth, endOfMonth } from 'date-fns';
+import { format, parseISO, isWithinInterval, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 interface Props {
@@ -123,17 +123,13 @@ const AnalyticsView: React.FC<Props> = ({ monthData, allData = [], totals, userP
 
   // === AGREGAÇÃO DE DADOS POR DATA ===
   const aggregatedReport = useMemo(() => {
-    // 1. Coletar todas as transações de todos os meses disponíveis
     let allTransactions: BaseTransaction[] = [];
-    
-    // Se allData foi passado (Dashboard enviou), usa ele. Se não, usa apenas monthData como fallback.
     const sourceData = allData.length > 0 ? allData : [monthData];
     
     sourceData.forEach(d => {
       if (d.transactions) allTransactions = [...allTransactions, ...d.transactions];
     });
 
-    // 2. Filtrar pelo range de datas
     const startDate = new Date(dateRange.start + 'T00:00:00');
     const endDate = new Date(dateRange.end + 'T23:59:59');
 
@@ -144,13 +140,11 @@ const AnalyticsView: React.FC<Props> = ({ monthData, allData = [], totals, userP
       } catch { return false; }
     });
 
-    // 3. Calcular Totais
     const totalIncome = filteredTransactions.filter(t => t.type === 'Receita').reduce((acc, t) => acc + t.value, 0);
     const totalExpense = filteredTransactions.filter(t => t.type === 'Despesa').reduce((acc, t) => acc + t.value, 0);
     const result = totalIncome - totalExpense;
     const margin = totalIncome > 0 ? (result / totalIncome) * 100 : 0;
 
-    // 4. Agrupar por Categoria
     const categories = userProfile.customCategories || DEFAULT_CATEGORIES;
     const catReport: Record<string, { total: number; count: number; transactions: BaseTransaction[] }> = {};
     
@@ -173,13 +167,24 @@ const AnalyticsView: React.FC<Props> = ({ monthData, allData = [], totals, userP
       .filter(i => i.total > 0)
       .sort((a, b) => b.total - a.total);
 
-    // 5. Top 5 Despesas
     const topExpenses = [...filteredTransactions]
       .filter(t => t.type === 'Despesa')
       .sort((a, b) => b.value - a.value)
       .slice(0, 5);
 
-    return { totalIncome, totalExpense, result, margin, categoryList, topExpenses, transactionCount: filteredTransactions.length };
+    // Comparativo Diário
+    const days = eachDayOfInterval({ start: startDate, end: endDate });
+    const dailyData = days.map(day => {
+       const dayStr = format(day, 'yyyy-MM-dd');
+       const dayTxs = filteredTransactions.filter(t => t.dueDate === dayStr);
+       return {
+          date: day,
+          income: dayTxs.filter(t => t.type === 'Receita').reduce((a, b) => a + b.value, 0),
+          expense: dayTxs.filter(t => t.type === 'Despesa').reduce((a, b) => a + b.value, 0),
+       };
+    }).filter(d => d.income > 0 || d.expense > 0);
+
+    return { totalIncome, totalExpense, result, margin, categoryList, topExpenses, dailyData, transactionCount: filteredTransactions.length };
   }, [dateRange, allData, monthData, userProfile.customCategories]);
 
   // === GERAÇÃO DE PDF ===
@@ -189,18 +194,9 @@ const AnalyticsView: React.FC<Props> = ({ monthData, allData = [], totals, userP
 
     try {
       const element = reportRef.current;
-      
-      // Temporariamente mostrar o elemento oculto para renderização
       element.style.display = 'block';
-      
-      const canvas = await html2canvas(element, {
-        scale: 2, // Alta resolução
-        useCORS: true,
-        backgroundColor: '#ffffff'
-      });
-
+      const canvas = await html2canvas(element, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
       element.style.display = 'none';
-
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pdfWidth = pdf.internal.pageSize.getWidth();
@@ -208,13 +204,8 @@ const AnalyticsView: React.FC<Props> = ({ monthData, allData = [], totals, userP
       const imgWidth = canvas.width;
       const imgHeight = canvas.height;
       const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
-      
-      const imgX = (pdfWidth - imgWidth * ratio) / 2;
-      const imgY = 10; // Margem superior
-
       pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, (imgHeight * pdfWidth) / imgWidth);
       pdf.save(`Relatorio_Financeiro_${dateRange.start}_${dateRange.end}.pdf`);
-
     } catch (error) {
       console.error("Erro ao gerar PDF:", error);
       alert("Houve um erro ao gerar o PDF. Tente novamente.");
@@ -224,13 +215,8 @@ const AnalyticsView: React.FC<Props> = ({ monthData, allData = [], totals, userP
   };
 
   const handleAudit = async () => {
-    if (creditInfo.remaining <= 0 && !isUnlimited) {
-        // ... (Lógica existente de bloqueio)
-        return;
-    }
+    if (creditInfo.remaining <= 0 && !isUnlimited) return;
     setLoading(true);
-    // ... (Lógica existente de IA)
-    // Mock rápido para não quebrar o código existente se não tiver a lógica completa aqui
     setTimeout(() => setLoading(false), 2000); 
   };
 
@@ -355,7 +341,7 @@ const AnalyticsView: React.FC<Props> = ({ monthData, allData = [], totals, userP
         </>
       ) : (
         /* ========================================================================================= */
-        /* VIEW DE RELATÓRIOS AVANÇADOS & PDF (ATUALIZADO ETAPA 4) */
+        /* VIEW DE RELATÓRIOS AVANÇADOS & PDF */
         /* ========================================================================================= */
         <div className="animate-in fade-in duration-500 space-y-8">
            
@@ -414,10 +400,40 @@ const AnalyticsView: React.FC<Props> = ({ monthData, allData = [], totals, userP
               </div>
            </div>
 
+           {/* Daily Breakdown (NOVA SEÇÃO PEDIDA) */}
+           <div className="bg-white rounded-[32px] border border-slate-200 shadow-xl overflow-hidden p-8">
+              <div className="flex items-center gap-3 mb-6">
+                 <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl"><CalendarDays size={20}/></div>
+                 <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest">Fluxo Diário Comparativo</h4>
+              </div>
+              <div className="overflow-x-auto no-scrollbar">
+                <table className="w-full text-left border-collapse min-w-[600px]">
+                   <thead>
+                      <tr className="border-b border-slate-100 text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                         <th className="pb-4 pl-2">Data</th>
+                         <th className="pb-4 text-right">Entradas</th>
+                         <th className="pb-4 text-right">Saídas</th>
+                         <th className="pb-4 text-right pr-2">Saldo Dia</th>
+                      </tr>
+                   </thead>
+                   <tbody className="divide-y divide-slate-50">
+                      {aggregatedReport.dailyData.map((day, idx) => (
+                        <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                           <td className="py-3 pl-2 text-xs font-bold text-slate-700">{format(day.date, 'dd/MM (eee)', {locale: ptBR})}</td>
+                           <td className="py-3 text-right text-xs font-black font-mono text-emerald-600">{day.income > 0 ? day.income.toLocaleString('pt-BR', {minimumFractionDigits: 2}) : '-'}</td>
+                           <td className="py-3 text-right text-xs font-black font-mono text-rose-600">{day.expense > 0 ? day.expense.toLocaleString('pt-BR', {minimumFractionDigits: 2}) : '-'}</td>
+                           <td className={`py-3 text-right pr-2 text-xs font-black font-mono ${day.income - day.expense >= 0 ? 'text-indigo-600' : 'text-amber-600'}`}>{(day.income - day.expense).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                        </tr>
+                      ))}
+                   </tbody>
+                </table>
+              </div>
+           </div>
+
            {/* Category Grid (Drill-Down) */}
-           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start">
               {aggregatedReport.categoryList.map((item, idx) => (
-                <div key={item.id} className="bg-white rounded-[32px] border border-slate-200 shadow-xl overflow-hidden transition-all hover:shadow-2xl hover:border-indigo-200">
+                <div key={item.id} className="bg-white rounded-[32px] border border-slate-200 shadow-xl overflow-hidden transition-all hover:shadow-2xl hover:border-indigo-200 self-start">
                    <div 
                      className="p-6 cursor-pointer"
                      onClick={() => setExpandedCategory(expandedCategory === item.id ? null : item.id)}

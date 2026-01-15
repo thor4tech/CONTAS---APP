@@ -35,9 +35,10 @@ const SplitTransactionView: React.FC<Props> = ({ transactions, categories, partn
   };
 
   return (
-    <div className="space-y-12 animate-in fade-in duration-500 w-full max-w-full pb-10">
-      <div className="flex flex-col md:flex-row gap-6 justify-center items-center sticky top-[150px] md:top-[160px] z-[85]">
-        <div className="flex p-1 bg-white/90 border border-slate-200 rounded-full shadow-2xl backdrop-blur-xl w-full max-w-[340px] md:max-w-md">
+    <div className="space-y-8 animate-in fade-in duration-500 w-full max-w-full pb-10">
+      {/* Sticky Header Control */}
+      <div className="flex flex-col md:flex-row gap-6 justify-center items-center sticky top-0 z-20 bg-slate-50/90 backdrop-blur-md py-4 border-b border-slate-200/50 -mx-4 px-4 md:mx-0 md:px-0 md:border-none md:bg-transparent md:backdrop-blur-none">
+        <div className="flex p-1 bg-white border border-slate-200 rounded-full shadow-lg w-full max-w-[340px] md:max-w-md">
            <button 
              onClick={() => setActiveView('income')} 
              className={`flex-1 px-4 py-2.5 md:py-3 text-[9px] md:text-[10px] font-black uppercase tracking-widest rounded-full transition-all ${activeView === 'income' ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-50'}`}
@@ -61,7 +62,7 @@ const SplitTransactionView: React.FC<Props> = ({ transactions, categories, partn
         {onDuplicatePrevious && (
           <button 
             onClick={onDuplicatePrevious}
-            className="flex items-center gap-3 px-6 py-3 bg-white border border-indigo-100 text-indigo-600 rounded-full text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-indigo-50 hover:scale-105 active:scale-95 transition-all"
+            className="hidden md:flex items-center gap-3 px-6 py-3 bg-white border border-indigo-100 text-indigo-600 rounded-full text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-indigo-50 hover:scale-105 active:scale-95 transition-all"
           >
             <Copy size={14} /> Duplicar Anterior
           </button>

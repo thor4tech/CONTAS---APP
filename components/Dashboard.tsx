@@ -21,140 +21,304 @@ import {
   Calendar, List, Users, Activity, 
   Landmark, Zap, Settings, CreditCard as CardIcon, 
   BarChart3, Heart, TrendingDown, TrendingUp, Clock, ShieldCheck,
-  Briefcase, Eye, EyeOff, Target, ArrowUpRight, Share2, Copy
+  Briefcase, Eye, EyeOff, Target, ArrowUpRight, Share2, Copy, Check, CalendarDays, Wallet, Building2, Lock,
+  Search, Bell, Moon, LogOut, Menu, X, Edit2
 } from 'lucide-react';
+import { addMonths, subMonths, endOfMonth, isBefore, startOfMonth, getDate, setDate, lastDayOfMonth } from 'date-fns';
 
 interface DashboardProps {
   user: any;
 }
 
-const KPIItem = ({ label, value, sub, icon: Icon, color, special, showValues, dual, info }: any) => {
+// --- SUB-COMPONENTES DE UI ---
+
+const SidebarItem = ({ icon: Icon, label, active, onClick }: any) => (
+  <button 
+    onClick={onClick}
+    className={`w-full flex items-center gap-4 px-6 py-5 rounded-[20px] transition-all duration-300 group ${active ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200' : 'text-slate-400 hover:bg-slate-50 hover:text-slate-600'}`}
+  >
+    <Icon size={22} className={`transition-colors ${active ? 'text-white' : 'text-slate-300 group-hover:text-slate-500'}`} strokeWidth={2.5} />
+    <span className="text-[12px] font-black uppercase tracking-[0.2em]">{label}</span>
+  </button>
+);
+
+const KPIItem = ({ label, value, icon: Icon, color, showValues, info, gradient }: any) => {
+  // Configuração visual avançada para os ícones (Pseudo-3D)
+  const iconStyles: any = {
+    'blue': 'bg-gradient-to-br from-blue-400 to-blue-600 text-white shadow-blue-200',
+    'emerald': 'bg-gradient-to-br from-emerald-400 to-emerald-600 text-white shadow-emerald-200',
+    'amber': 'bg-gradient-to-br from-amber-400 to-amber-600 text-white shadow-amber-200',
+    'rose': 'bg-gradient-to-br from-rose-400 to-rose-600 text-white shadow-rose-200',
+    'slate': 'bg-gradient-to-br from-slate-700 to-slate-900 text-white shadow-slate-300',
+  };
+
+  const selectedStyle = iconStyles[gradient] || iconStyles['slate'];
+  
   return (
-    <div className={`relative flex flex-col justify-between p-6 md:p-8 rounded-[40px] border transition-all group shadow-2xl overflow-hidden min-h-[180px] ${special ? 'bg-[#020617] text-white border-blue-500/30' : 'bg-white border-slate-100'}`}>
-      <div className="relative z-10">
-        <div className="flex items-center gap-2 mb-4">
-          <span className={`text-[9px] font-black uppercase tracking-[0.2em] block ${special ? 'text-blue-400' : 'text-slate-400'}`}>{label}</span>
-          <FloatingInfo title={label} text={info} />
+    <div className="bg-white p-6 rounded-[32px] border border-slate-100 shadow-sm hover:shadow-xl transition-all group flex flex-col justify-between min-h-[160px] relative overflow-hidden">
+      <div className="flex justify-between items-start mb-4 relative z-10">
+        <div className={`p-3.5 rounded-2xl shadow-lg ${selectedStyle} group-hover:scale-110 transition-transform duration-300 ring-2 ring-white`}>
+           <Icon size={22} strokeWidth={2.5} />
         </div>
-        {dual ? (
-          <div className="space-y-4">
-            <div>
-              <span className="text-[8px] font-bold text-white/40 uppercase block mb-1 tracking-widest">Poder Total (C/ Reserva):</span>
-              <div className="text-xl md:text-2xl font-black font-mono tracking-tighter text-[#4ade80] drop-shadow-[0_0_10px_rgba(74,222,128,0.3)]">
-                {showValues ? (value.comReserva || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'R$ ••••••'}
-              </div>
-            </div>
-            <div className="pt-3 border-t border-white/10">
-              <span className="text-[8px] font-bold text-white/40 uppercase block mb-1 tracking-widest">Líquido (S/ Reserva):</span>
-              <div className="text-lg md:text-xl font-black font-mono tracking-tighter text-white">
-                {showValues ? (value.semReserva || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'R$ ••••••'}
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className={`text-2xl md:text-4xl font-black font-mono tracking-tighter ${special ? 'text-white' : color}`}>
-            {showValues ? (
-              <span className="flex items-baseline gap-1">
-                <span className="text-sm md:text-base opacity-40 font-bold">R$</span>
-                {(value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </span>
-            ) : 'R$ ••••••'}
-          </div>
-        )}
+        <div className="flex items-center">
+           <FloatingInfo title={label} text={info} />
+        </div>
       </div>
-      <div className={`absolute top-6 right-6 p-3 rounded-2xl border ${special ? 'bg-blue-600/20 border-blue-500/30 text-blue-400' : 'bg-slate-50 border-slate-100 ' + color}`}>
-        <Icon size={20} />
+      <div className="relative z-10">
+        <span className={`text-[10px] font-black uppercase tracking-widest block mb-2 opacity-60 ${color}`}>{label}</span>
+        <div className={`text-3xl font-black font-mono tracking-tighter ${color}`}>
+          {showValues ? (
+            (value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+          ) : '••••••'}
+        </div>
       </div>
-      {!dual && <span className={`text-[8px] font-black uppercase tracking-[0.2em] relative z-10 mt-4 ${special ? 'text-white/40' : 'text-slate-300'}`}>{sub}</span>}
+      {/* Decoração de fundo sutil */}
+      <div className={`absolute -right-6 -bottom-6 opacity-[0.05] ${color} scale-[2.5] pointer-events-none`}>
+         <Icon size={64} />
+      </div>
     </div>
   );
 };
 
-const AssetCard = ({ item, onUpdateBalance, showValues, onUpdateDetail, isReserva }: any) => {
+const BankRow = ({ item, onUpdateBalance, showValues }: any) => {
   const [val, setVal] = useState(item.balance?.toString() || "0");
   const [isEditing, setIsEditing] = useState(false);
 
-  useEffect(() => {
-    if (!isEditing) setVal(item.balance?.toString() || "0");
-  }, [item.balance, isEditing]);
+  useEffect(() => { if (!isEditing) setVal(item.balance?.toString() || "0"); }, [item.balance, isEditing]);
+
+  const handleSave = (e?: React.FormEvent) => {
+    e?.preventDefault();
+    onUpdateBalance(parseFloat(val) || 0);
+    setIsEditing(false);
+  };
 
   return (
-    <div className={`p-5 rounded-[32px] border transition-all flex flex-col gap-4 group relative overflow-hidden shadow-lg
-      ${isReserva ? 'bg-[#0f172a] border-blue-500/40 border-2' : 'bg-white border-slate-100 hover:border-blue-200'}
-    `}>
-       {isReserva && (
-         <div className="absolute top-0 right-0 p-3 z-20">
-            <div className="bg-amber-500 text-black text-[7px] font-black px-3 py-1 rounded-full shadow-lg animate-pulse uppercase tracking-widest">
-              PROTEGIDO
-            </div>
-         </div>
-       )}
-       
-       <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-             <div className={`p-2.5 rounded-xl ${isReserva ? 'bg-blue-500/20 text-blue-400' : item.type === 'bank' ? 'bg-blue-50 text-blue-600' : 'bg-rose-50 text-rose-600'}`}>
-                {isReserva ? <Heart size={18} fill="currentColor"/> : item.type === 'bank' ? <Landmark size={18}/> : <CardIcon size={18}/>}
-             </div>
-             <div>
-                <h5 className={`text-[10px] font-black uppercase tracking-widest ${isReserva ? 'text-white' : 'text-slate-900'}`}>{item.name}</h5>
-                {item.type === 'card' && (
-                   <div className="flex items-center gap-2 mt-1">
-                     <span className="text-[7px] font-black text-slate-400 uppercase">Venc:</span>
-                     <input 
-                       type="number" 
-                       className="w-12 text-[11px] font-black text-blue-600 bg-slate-50 border-2 border-slate-200 rounded-xl px-2 py-0.5 outline-none focus:border-blue-400 transition-all"
-                       value={item.dueDate || ''}
-                       onChange={e => onUpdateDetail('dueDate', e.target.value)}
-                     />
-                   </div>
-                )}
-             </div>
+    <div className="flex items-center justify-between p-6 hover:bg-slate-50 rounded-3xl transition-colors group border-b border-slate-50 last:border-0">
+       <div className="flex items-center gap-5">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-50 to-indigo-100 flex items-center justify-center text-indigo-600 border border-indigo-200/50 shadow-sm group-hover:scale-105 transition-transform">
+             <Building2 size={24} />
           </div>
-
-          <div className="flex flex-col items-end">
-            {isEditing ? (
-              <input 
-                autoFocus 
-                type="number" 
-                className={`w-28 bg-transparent border-b-2 border-blue-500 outline-none text-right font-mono font-black text-sm ${isReserva ? 'text-[#4ade80]' : 'text-slate-900'}`}
-                value={val}
-                onChange={e => setVal(e.target.value)}
-                onBlur={() => { onUpdateBalance(parseFloat(val) || 0); setIsEditing(false); }}
-                onKeyDown={e => e.key === 'Enter' && (e.target as any).blur()}
-              />
-            ) : (
-              <div onClick={() => setIsEditing(true)} className={`text-sm md:text-base font-black font-mono cursor-pointer transition-colors ${isReserva ? 'text-[#4ade80] drop-shadow-[0_0_8px_rgba(74,222,128,0.4)]' : 'text-slate-900 hover:text-blue-600'}`}>
-                 {showValues ? (
-                    <span className="flex items-baseline gap-1">
-                      <span className="text-[10px] opacity-40 font-bold">R$</span>
-                      {(item.balance || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </span>
-                 ) : 'R$ •••'}
-              </div>
-            )}
+          <div>
+             <span className="text-sm font-black uppercase tracking-tight text-slate-900 block mb-1">{item.name}</span>
+             <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest bg-slate-100 px-2 py-1 rounded-lg">Conta Corrente</span>
           </div>
        </div>
-
-       {item.type === 'card' && (
-         <div className="flex items-center justify-between pt-3 border-t border-slate-50">
-            <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Status da Fatura:</span>
-            <button 
-              onClick={() => onUpdateDetail('situation', item.situation === 'PAGO' ? 'PENDENTE' : 'PAGO')}
-              className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border transition-all shadow-sm ${item.situation === 'PAGO' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-amber-50 text-amber-600 border-amber-200'}`}
-            >
-              {item.situation || 'PENDENTE'}
-            </button>
-         </div>
-       )}
+       <div>
+          {isEditing ? (
+             <form onSubmit={handleSave} className="flex items-center">
+                <input 
+                  autoFocus 
+                  type="number" step="0.01"
+                  className="w-32 md:w-40 bg-indigo-50/30 border-b-2 border-indigo-500 rounded-lg px-2 py-1 text-right font-mono font-black text-lg outline-none text-indigo-700 transition-all placeholder:text-indigo-300"
+                  value={val}
+                  onChange={e => setVal(e.target.value)}
+                  onBlur={() => setTimeout(handleSave, 200)}
+                />
+             </form>
+          ) : (
+             <div onClick={() => setIsEditing(true)} className="text-right cursor-pointer hover:scale-105 transition-transform origin-right p-2 rounded-xl hover:bg-white hover:shadow-sm border border-transparent hover:border-slate-100">
+                <div className={`font-black font-mono text-slate-900 text-lg md:text-xl ${showValues ? '' : 'tracking-widest'}`}>
+                   {showValues ? (item.balance || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '•••••'}
+                </div>
+             </div>
+          )}
+       </div>
     </div>
   );
 };
+
+const CreditCardCompact = ({ item, onUpdateDetail, showValues, onUpdateBalance }: any) => {
+   const [val, setVal] = useState(item.balance?.toString() || "0");
+   const [isEditing, setIsEditing] = useState(false);
+   
+   const [isEditingDate, setIsEditingDate] = useState(false);
+   const [dateVal, setDateVal] = useState(item.dueDate || '10');
+
+   useEffect(() => { if (!isEditing) setVal(item.balance?.toString() || "0"); }, [item.balance, isEditing]);
+   useEffect(() => { if (!isEditingDate) setDateVal(item.dueDate || '10'); }, [item.dueDate, isEditingDate]);
+
+   const handleSave = (e?: React.FormEvent) => {
+     e?.preventDefault();
+     onUpdateBalance(parseFloat(val) || 0);
+     setIsEditing(false);
+   };
+
+   const handleSaveDate = (e?: React.FormEvent) => {
+     e?.preventDefault();
+     if(parseInt(dateVal) > 0 && parseInt(dateVal) <= 31) {
+        onUpdateDetail('dueDate', dateVal);
+     }
+     setIsEditingDate(false);
+   };
+
+   const getCardStyle = (name: string) => {
+      const n = name.toLowerCase();
+      if (n.includes('nubank')) return 'bg-[#820ad1]';
+      if (n.includes('inter')) return 'bg-[#ff7a00]';
+      if (n.includes('xp')) return 'bg-slate-900';
+      return 'bg-[#1e293b]';
+   };
+
+   return (
+      <div className={`${getCardStyle(item.name)} p-6 rounded-[32px] text-white shadow-lg relative overflow-hidden group transition-transform hover:-translate-y-1 hover:shadow-2xl`}>
+         <div className="flex justify-between items-start mb-6">
+            <div className="flex items-center gap-3">
+               <div className="p-2 bg-white/10 rounded-xl backdrop-blur-sm shadow-inner border border-white/10">
+                  <CardIcon size={18} className="text-white/90"/>
+               </div>
+               <span className="text-xs font-black uppercase tracking-widest truncate max-w-[120px] text-shadow-sm">{item.name}</span>
+            </div>
+            <button 
+               onClick={() => onUpdateDetail('situation', item.situation === 'PAGO' ? 'PENDENTE' : 'PAGO')}
+               className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase border tracking-widest transition-all ${item.situation === 'PAGO' ? 'bg-emerald-500 border-emerald-400 text-white shadow-lg' : 'bg-black/20 border-white/20 text-white/50 hover:bg-black/40 hover:text-white hover:border-white/40'}`}
+            >
+               {item.situation}
+            </button>
+         </div>
+         <div className="mb-4">
+            <span className="text-[9px] font-bold text-white/40 uppercase tracking-widest block mb-2">Fatura Atual</span>
+            {isEditing ? (
+                <form onSubmit={handleSave}>
+                   <input 
+                     autoFocus 
+                     type="number" step="0.01" 
+                     className="w-full bg-black/20 rounded-xl px-3 py-2 text-2xl font-mono font-black text-white outline-none border border-white/20 focus:border-white/50 transition-all shadow-inner" 
+                     value={val} 
+                     onChange={e => setVal(e.target.value)} 
+                     onBlur={() => setTimeout(handleSave, 200)} 
+                   />
+                </form>
+            ) : (
+                <div onClick={() => setIsEditing(true)} className="text-3xl font-mono font-black tracking-tighter cursor-pointer hover:opacity-80 transition-opacity p-1 -ml-1 rounded-lg hover:bg-white/5 border border-transparent hover:border-white/10">
+                   {showValues ? (item.balance || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '••••••'}
+                </div>
+            )}
+         </div>
+         <div className="pt-4 border-t border-white/10 min-h-[42px] flex items-center">
+            {isEditingDate ? (
+                <form onSubmit={handleSaveDate} className="flex items-center gap-3 w-full animate-in fade-in duration-200">
+                   <div className="flex items-center gap-2 bg-black/20 rounded-xl px-3 py-1.5 border border-white/20 w-full shadow-inner">
+                      <CalendarDays size={14} className="text-white/60" />
+                      <span className="text-[10px] font-bold text-white/60 uppercase tracking-widest whitespace-nowrap">DIA</span>
+                      <input 
+                        autoFocus
+                        type="number"
+                        min="1"
+                        max="31"
+                        className="w-full bg-transparent text-sm font-black text-white outline-none text-center"
+                        value={dateVal}
+                        onChange={e => setDateVal(e.target.value)}
+                        onBlur={() => setTimeout(handleSaveDate, 200)}
+                      />
+                   </div>
+                </form>
+            ) : (
+                <div 
+                  onClick={() => setIsEditingDate(true)} 
+                  className="flex justify-between items-center w-full cursor-pointer hover:bg-white/5 p-2 -m-2 rounded-xl transition-colors group/date"
+                >
+                   <div className="flex items-center gap-2 text-[9px] font-bold text-white/60 uppercase tracking-widest group-hover/date:text-white transition-colors">
+                      <CalendarDays size={12}/> Vence dia <span className="text-white font-black text-xs ml-1 border-b border-white/20 pb-0.5 shadow-sm">{item.dueDate || '10'}</span>
+                   </div>
+                   <div className="h-2 w-2 rounded-full bg-white/20 animate-pulse group-hover/date:bg-white transition-colors shadow-[0_0_10px_rgba(255,255,255,0.5)]"></div>
+                </div>
+            )}
+         </div>
+      </div>
+   );
+};
+
+const ReservaWidget = ({ value, onChange, showValues }: any) => {
+  return (
+    <div className="bg-gradient-to-br from-[#0f172a] via-[#1e293b] to-[#0f172a] p-8 rounded-[32px] text-white shadow-2xl relative overflow-hidden group border border-slate-800 ring-1 ring-white/5">
+      {/* Background decoration 3D effect */}
+      <div className="absolute top-0 right-0 p-16 opacity-[0.03] text-white rotate-12 pointer-events-none transition-transform group-hover:scale-110 duration-700">
+         <ShieldCheck size={120}/>
+      </div>
+      
+      <div className="relative z-10 flex flex-col justify-between h-full gap-6">
+         <div className="flex justify-between items-start">
+            <div className="flex flex-col gap-1">
+               <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Reserva de Emergência</span>
+                  <FloatingInfo title="Reserva" text="Valor guardado em conta separada (Cofre/Investimento). Este valor SOMA ao seu patrimônio total." />
+               </div>
+               <span className="text-[9px] text-emerald-500 font-bold uppercase tracking-widest animate-pulse">● Blindado</span>
+            </div>
+            
+            {/* Ícone 3D Melhorado */}
+            <div className="p-4 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-2xl text-white shadow-[0_10px_20px_rgba(16,185,129,0.3)] ring-2 ring-white/20 transform group-hover:scale-110 transition-transform duration-500 flex items-center justify-center">
+               <ShieldCheck size={26} strokeWidth={2.5} className="drop-shadow-md" />
+            </div>
+         </div>
+         
+         <div className="bg-[#050912]/60 p-5 rounded-[24px] border border-white/5 shadow-[inset_0_4px_12px_rgba(0,0,0,0.6)] flex items-center gap-3 relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/5 to-transparent pointer-events-none"></div>
+            <span className="text-slate-600 font-mono font-black text-xl select-none z-10">R$</span>
+            <input 
+               type="number" 
+               className="bg-transparent border-none outline-none text-3xl md:text-4xl font-black font-mono text-white w-full placeholder:text-slate-800 p-0 focus:ring-0 z-10 text-shadow-lg"
+               value={value || ''}
+               onChange={e => onChange(parseFloat(e.target.value) || 0)}
+               placeholder="0,00"
+            />
+         </div>
+
+         <div className="pt-4 border-t border-white/5 flex justify-between items-center">
+            <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">Patrimônio Protegido</span>
+            <Lock size={12} className="text-slate-600" />
+         </div>
+      </div>
+   </div>
+  );
+};
+
+const ComandoWidget = ({ value, showValues }: any) => {
+  return (
+    <div className="bg-gradient-to-br from-indigo-600 to-violet-700 p-8 rounded-[32px] text-white shadow-2xl relative overflow-hidden group border border-indigo-500/30 flex flex-col justify-between ring-1 ring-white/10">
+       <div className="absolute top-0 right-0 w-[250px] h-[250px] bg-white rounded-full blur-[120px] opacity-10 -mr-20 -mt-20 pointer-events-none animate-pulse"></div>
+       <div className="absolute bottom-0 left-0 w-[200px] h-[200px] bg-indigo-900 rounded-full blur-[100px] opacity-40 -ml-10 -mb-10 pointer-events-none"></div>
+       
+       <div className="relative z-10">
+          <div className="flex items-center justify-between mb-8">
+             <div className="flex items-center gap-3">
+                <div className="p-3 bg-white/20 rounded-2xl backdrop-blur-md border border-white/20 shadow-lg"><Zap size={20} className="text-amber-300 drop-shadow-md" fill="currentColor" /></div>
+                <div>
+                   <span className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-100 block">Poder de Comando</span>
+                   <div className="flex items-center mt-1">
+                      <FloatingInfo title="Comando Real" text="Projeção de fim de mês: (Saldo Atual + A Receber) - (Contas a Pagar). Se positivo, você fecha o mês no verde." />
+                   </div>
+                </div>
+             </div>
+          </div>
+          
+          <div className="space-y-6">
+             <div className="bg-white/10 p-5 rounded-[24px] border border-white/10 backdrop-blur-md shadow-[0_8px_32px_rgba(0,0,0,0.1)]">
+                <span className="text-[9px] font-bold text-indigo-200 uppercase tracking-widest block mb-2 flex items-center gap-2"><Activity size={12}/> Líquido (Sem Reserva)</span>
+                <div className="text-3xl md:text-4xl font-black font-mono tracking-tighter text-white drop-shadow-md">
+                   {showValues ? (value?.semReserva || 0).toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'}) : 'R$ ••••••'}
+                </div>
+             </div>
+             <div className="px-2 pt-2">
+                <span className="text-[9px] font-bold text-indigo-300 uppercase tracking-widest block mb-1">Total (Com Reserva)</span>
+                <div className="text-xl font-black font-mono tracking-tighter text-indigo-200 opacity-90 text-shadow-sm">
+                   {showValues ? (value?.comReserva || 0).toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'}) : 'R$ ••••••'}
+                </div>
+             </div>
+          </div>
+       </div>
+    </div>
+  );
+};
+
+// --- COMPONENTE PRINCIPAL ---
 
 const Dashboard: React.FC<DashboardProps> = ({ user }) => {
   const [showValues, setShowValues] = useState(true);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isDuplicateModalOpen, setIsDuplicateModalOpen] = useState(false);
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false); // Novo estado para mobile menu
   const [editingTransaction, setEditingTransaction] = useState<BaseTransaction | undefined>(undefined);
   const [defaultTransactionType, setDefaultTransactionType] = useState<'Receita' | 'Despesa'>('Despesa');
   
@@ -171,7 +335,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
     userProfile: { email: '', name: '', company: 'Minha Empresa', planId: 'PRO', subscriptionStatus: 'TRIAL', createdAt: '', trialEnd: '', globalAssets: [] }
   });
 
-  // Manipulador do botão voltar do celular/navegador
   useEffect(() => {
     const handlePopState = (event: PopStateEvent) => {
       if (event.state?.view) {
@@ -187,6 +350,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
   const setView = (newView: any) => {
     setAppState(p => ({ ...p, view: newView }));
     window.history.pushState({ view: newView }, '', '');
+    setIsMobileMenuOpen(false); // Fecha menu mobile ao navegar
   };
 
   useEffect(() => {
@@ -208,6 +372,35 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
 
   const currentMonthId = `${appState.currentYear}-${(MONTHS.indexOf(appState.currentMonth) + 1).toString().padStart(2, '0')}`;
   
+  useEffect(() => {
+    const checkAndRollover = async () => {
+      if (!user?.uid || appState.data.length === 0) return;
+      const currentMonthIndex = MONTHS.indexOf(appState.currentMonth);
+      const prevDate = subMonths(new Date(appState.currentYear, currentMonthIndex), 1);
+      const prevMonthId = `${prevDate.getFullYear()}-${(prevDate.getMonth() + 1).toString().padStart(2, '0')}`;
+      const prevData = appState.data.find(d => `${d.year}-${(MONTHS.indexOf(d.month) + 1).toString().padStart(2, '0')}` === prevMonthId);
+      if (!prevData || !prevData.transactions) return;
+      const pendingFromLastMonth = prevData.transactions.filter(t => t.situation === 'PENDENTE');
+      if (pendingFromLastMonth.length > 0) {
+        const newPrevTransactions = prevData.transactions.filter(t => t.situation !== 'PENDENTE');
+        const currentData = appState.data.find(d => `${d.year}-${(MONTHS.indexOf(d.month) + 1).toString().padStart(2, '0')}` === currentMonthId);
+        const rolledOverTransactions = pendingFromLastMonth.map(t => {
+          const originalDay = parseInt(t.dueDate.split('-')[2]);
+          const targetDate = setDate(new Date(appState.currentYear, currentMonthIndex), Math.min(originalDay, getDate(lastDayOfMonth(new Date(appState.currentYear, currentMonthIndex)))));
+          return { ...t, monthRef: currentMonthId, dueDate: targetDate.toISOString().split('T')[0], description: `${t.description} (Rolagem)` };
+        });
+        try {
+          await setDoc(doc(db, `users/${user.uid}/data`, prevMonthId), { ...prevData, transactions: newPrevTransactions }, { merge: true });
+          const newCurrentTransactions = [...(currentData?.transactions || []), ...rolledOverTransactions];
+          const baseCurrentData = currentData || { ...INITIAL_DATA, year: appState.currentYear, month: appState.currentMonth };
+          await setDoc(doc(db, `users/${user.uid}/data`, currentMonthId), { ...baseCurrentData, transactions: newCurrentTransactions }, { merge: true });
+        } catch (error) { console.error("Erro na rolagem automática:", error); }
+      }
+    };
+    const timer = setTimeout(() => { checkAndRollover(); }, 2000);
+    return () => clearTimeout(timer);
+  }, [currentMonthId, appState.data]);
+
   const currentMonthData = useMemo(() => {
     const found = appState.data.find(d => `${d.year}-${(MONTHS.indexOf(d.month) + 1).toString().padStart(2, '0')}` === currentMonthId);
     const completeData: FinancialData = {
@@ -216,6 +409,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
       metaFaturamento: found?.metaFaturamento || 0,
       reserva: found?.reserva || 0,
       reservaEmergencia: found?.reservaEmergencia || 0,
+      investimento: found?.investimento || 0,
       transactions: found?.transactions || [],
       balances: found?.balances || {},
       cardDetails: found?.cardDetails || {}
@@ -241,17 +435,36 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
     const divTotal = txs.filter(t => t.type === 'Despesa').reduce((a, t) => a + (t.value || 0), 0) + currentMonthData.creditCards.reduce((a, c) => a + (c.balance || 0), 0);
     const divPend = txs.filter(t => t.type === 'Despesa' && t.situation !== 'PAGO').reduce((a, t) => a + (t.value || 0), 0) + 
                   currentMonthData.creditCards.filter(c => c.situation !== 'PAGO').reduce((a, c) => a + (c.balance || 0), 0);
-    const totalCarteira = currentMonthData.accounts.reduce((a, b) => a + (b.balance || 0), 0);
+    
+    // NOVO CÁLCULO: Reserva é um ativo à parte (conta investimento)
+    const saldoBancos = currentMonthData.accounts.reduce((a, b) => a + (b.balance || 0), 0);
     const res = currentMonthData.reservaEmergencia || 0;
+    
+    // Carteira Global = Saldo em Bancos + Reserva (Patrimônio Total)
+    const totalCarteira = saldoBancos + res;
+    
+    // Disponível = Apenas Saldo em Bancos (Liquidez Imediata, já que reserva está separada)
+    const disponivel = saldoBancos;
+    
     const meta = appState.userProfile.defaultMeta || 0;
-    const comReserva = totalCarteira + fatPend + res - divPend;
-    const semReserva = totalCarteira + fatPend - divPend;
+    
+    // Projeções
+    // Com Reserva = Patrimônio Total Projetado
+    const comReserva = totalCarteira + fatPend - divPend;
+    // Sem Reserva = Liquidez Projetada
+    const semReserva = disponivel + fatPend - divPend;
+
     const metaProgresso = meta > 0 ? (fatReal / meta) * 100 : 0;
     const gapMeta = Math.max(0, meta - fatReal);
+    
     return { 
-      fatTotal, fatReal, fatPend, divTotal, divPend, totalCarteira, meta, metaProgresso, gapMeta,
+      fatTotal, fatReal, fatPend, divTotal, divPend, 
+      totalCarteira, 
+      saldoBancos, // Exportando para usar na lista de bancos
+      meta, metaProgresso, gapMeta,
       comandoReal: { comReserva, semReserva },
-      reserva: res
+      reserva: res,
+      disponivel
     };
   }, [currentMonthData, appState.userProfile.defaultMeta]);
 
@@ -303,60 +516,32 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
     await setDoc(doc(db, `users/${user.uid}/data`, currentMonthId), { ...currentMonthData, transactions: txs }, { merge: true });
   };
 
-  // Funcao inteligente de salvamento em lote para suportar parcelas em meses diferentes
   const handleSaveTransaction = async (transactions: BaseTransaction[]) => {
     if (transactions.length === 0) return;
-
-    // Agrupar transações por mês de competência (YYYY-MM)
     const updatesByMonth: Record<string, BaseTransaction[]> = {};
-
     transactions.forEach(tx => {
        const date = new Date(tx.dueDate + 'T00:00:00');
        const monthId = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
-       // Garantir que a monthRef esteja sincronizada com a data de vencimento
        const txWithCorrectMonth = { ...tx, monthRef: monthId };
-
-       if (!updatesByMonth[monthId]) {
-          updatesByMonth[monthId] = [];
-       }
+       if (!updatesByMonth[monthId]) updatesByMonth[monthId] = [];
        updatesByMonth[monthId].push(txWithCorrectMonth);
     });
-
-    // Processar cada mês separadamente
     for (const [monthId, newTxs] of Object.entries(updatesByMonth)) {
        const docRef = doc(db, `users/${user.uid}/data`, monthId);
-       
-       // Tentar ler o documento atual (pode não estar carregado no appState se for um mês futuro)
-       // Usamos getDoc para garantir que temos a versão mais recente do banco antes de escrever
        const docSnap = await getDoc(docRef);
        let existingData: FinancialData;
-
        if (docSnap.exists()) {
           existingData = docSnap.data() as FinancialData;
        } else {
-          // Se o mês não existe, cria com estrutura inicial
           const [yearStr, monthNumStr] = monthId.split('-');
-          existingData = {
-             ...INITIAL_DATA,
-             year: parseInt(yearStr),
-             month: MONTHS[parseInt(monthNumStr) - 1]
-          };
+          existingData = { ...INITIAL_DATA, year: parseInt(yearStr), month: MONTHS[parseInt(monthNumStr) - 1] };
        }
-
-       // Mesclar transações
        let updatedTransactions = [...(existingData.transactions || [])];
-       
        newTxs.forEach(newTx => {
           const index = updatedTransactions.findIndex(t => t.id === newTx.id);
-          if (index !== -1) {
-             // Atualizar existente
-             updatedTransactions[index] = newTx;
-          } else {
-             // Adicionar novo
-             updatedTransactions.push(newTx);
-          }
+          if (index !== -1) updatedTransactions[index] = newTx;
+          else updatedTransactions.push(newTx);
        });
-
        await setDoc(docRef, { ...existingData, transactions: updatedTransactions }, { merge: true });
     }
   };
@@ -367,252 +552,303 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
     if (prevIdx < 0) { prevIdx = 11; prevYear--; }
     const prevMonthId = `${prevYear}-${(prevIdx + 1).toString().padStart(2, '0')}`;
     const prevData = appState.data.find(d => `${d.year}-${(MONTHS.indexOf(d.month) + 1).toString().padStart(2, '0')}` === prevMonthId);
-    
     if (!prevData || !prevData.transactions || prevData.transactions.length === 0) {
       alert("Nenhum lançamento encontrado no mês anterior para duplicar.");
       setIsDuplicateModalOpen(false);
       return;
     }
-
+    const currentMonthIndex = MONTHS.indexOf(appState.currentMonth);
     const newTransactions = prevData.transactions.map(t => {
-      let newDate = t.dueDate;
+      let targetDay = 1;
       try {
         const oldDate = new Date(t.dueDate + 'T00:00:00');
-        const day = oldDate.getDate();
-        newDate = `${appState.currentYear}-${(MONTHS.indexOf(appState.currentMonth) + 1).toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
-      } catch (e) {
-        newDate = new Date().toISOString().split('T')[0];
-      }
-      return { ...t, id: Math.random().toString(36).substr(2, 9), dueDate: newDate, situation: 'PENDENTE' as Situation, monthRef: currentMonthId };
+        targetDay = oldDate.getDate();
+      } catch { targetDay = 1; }
+      const targetDate = setDate(new Date(appState.currentYear, currentMonthIndex), Math.min(targetDay, getDate(lastDayOfMonth(new Date(appState.currentYear, currentMonthIndex)))));
+      const newDateStr = targetDate.toISOString().split('T')[0];
+      return { 
+          ...t, 
+          id: Math.random().toString(36).substr(2, 9), 
+          dueDate: newDateStr, 
+          situation: 'PENDENTE' as Situation, 
+          monthRef: currentMonthId 
+      };
     });
-
     const mergedTransactions = [...(currentMonthData.transactions || []), ...newTransactions];
     await setDoc(doc(db, `users/${user.uid}/data`, currentMonthId), { ...currentMonthData, transactions: mergedTransactions }, { merge: true });
     setIsDuplicateModalOpen(false);
   };
 
-  if (appState.view === 'onboarding') {
-    return <OnboardingWizard user={user} onFinish={() => setView('dashboard')} />;
-  }
+  if (appState.view === 'onboarding') return <OnboardingWizard user={user} onFinish={() => setView('dashboard')} />;
 
   const handleSaveProfile = async (profile: any) => {
     await setDoc(doc(db, `users/${user.uid}/profile`, 'settings'), profile);
   };
 
+  // --- MENU LATERAL (DESKTOP E MOBILE) ---
+  const SidebarContent = () => (
+    <>
+      <div className="p-8">
+        <div className="flex items-center gap-3 mb-12">
+            <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white font-black shadow-lg shadow-indigo-200">C</div>
+            <h1 className="text-sm font-black text-slate-900 uppercase tracking-tighter leading-tight">Cria Gestão <br/><span className="text-indigo-600">Pro</span></h1>
+        </div>
+        
+        <nav className="space-y-3">
+            <SidebarItem icon={LayoutDashboard} label="Dashboard" active={appState.view === 'dashboard'} onClick={() => setView('dashboard')} />
+            <SidebarItem icon={BarChart3} label="Estratégia" active={appState.view === 'analytics'} onClick={() => setView('analytics')} />
+            <SidebarItem icon={List} label="Fluxos" active={appState.view === 'transactions'} onClick={() => setView('transactions')} />
+            <SidebarItem icon={Users} label="CRM" active={appState.view === 'partners'} onClick={() => setView('partners')} />
+            <SidebarItem icon={Calendar} label="Agenda" active={appState.view === 'calendar'} onClick={() => setView('calendar')} />
+            <SidebarItem icon={Share2} label="Indicar" active={appState.view === 'referral'} onClick={() => setView('referral')} />
+        </nav>
+      </div>
+
+      <div className="p-8 border-t border-slate-50 mt-auto">
+        <button onClick={() => setIsSettingsOpen(true)} className="flex items-center gap-4 w-full p-4 rounded-2xl bg-slate-50 hover:bg-slate-100 transition-colors mb-2 border border-slate-100 group">
+            <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 font-bold overflow-hidden border-2 border-white group-hover:border-indigo-100 transition-colors">
+              {user.photoURL ? <img src={user.photoURL} alt="User" className="w-full h-full object-cover" /> : user.email?.[0].toUpperCase()}
+            </div>
+            <div className="text-left overflow-hidden">
+              <p className="text-[11px] font-black text-slate-900 truncate">{user.displayName || user.email?.split('@')[0]}</p>
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Configurar</p>
+            </div>
+        </button>
+      </div>
+    </>
+  );
+
   return (
-    <div className="min-h-screen bg-[#f8fafc] flex flex-col w-full items-center pb-24 overflow-x-hidden">
-      <header className="bg-white/90 border-b border-slate-100 sticky top-0 z-[110] backdrop-blur-xl w-full h-20 md:h-24 flex items-center px-4 md:px-12 justify-between">
-        <div className="flex items-center gap-3 md:gap-4">
-          <div className="w-8 h-8 md:w-10 md:h-10 bg-slate-900 rounded-2xl flex items-center justify-center text-white font-black shadow-xl">T</div>
-          <h1 className="text-xs md:text-sm font-black text-slate-900 uppercase tracking-tighter hidden sm:block">Cria Gestão <span className="text-blue-600">Pro</span></h1>
-        </div>
+    <div className="flex h-screen bg-slate-50 overflow-hidden font-inter">
+      {/* --- SIDEBAR DESKTOP --- */}
+      <aside className="hidden lg:flex w-72 bg-white border-r border-slate-100 flex-col justify-between z-20 shadow-xl">
+         <SidebarContent />
+      </aside>
 
-        <div className="flex items-center bg-slate-100 rounded-full p-1 scale-90 md:scale-100">
-          <button onClick={() => changeMonth(-1)} className="p-2 text-slate-400 hover:bg-white rounded-full transition-all"><ChevronLeft size={18}/></button>
-          <div className="px-3 md:px-6 text-center min-w-[110px] md:min-w-[140px]">
-            <span className="text-[9px] md:text-[10px] font-black text-slate-900 uppercase tracking-widest block">{appState.currentMonth}</span>
-            <span className="text-[7px] md:text-[8px] font-bold text-blue-500 block uppercase">{appState.currentYear}</span>
-          </div>
-          <button onClick={() => changeMonth(1)} className="p-2 text-slate-400 hover:bg-white rounded-full transition-all"><ChevronRight size={18}/></button>
-        </div>
+      {/* --- SIDEBAR MOBILE (OVERLAY) --- */}
+      <AnimatePresence>
+        {isMobileMenuOpen && (
+          <>
+            <motion.div 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }} 
+              exit={{ opacity: 0 }}
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="fixed inset-0 bg-slate-900/60 z-40 lg:hidden backdrop-blur-sm"
+            />
+            <motion.aside 
+              initial={{ x: '-100%' }} 
+              animate={{ x: 0 }} 
+              exit={{ x: '-100%' }}
+              transition={{ type: "spring", bounce: 0, duration: 0.4 }}
+              className="fixed inset-y-0 left-0 w-72 bg-white z-50 flex flex-col shadow-2xl lg:hidden"
+            >
+              <button onClick={() => setIsMobileMenuOpen(false)} className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-900"><X size={24}/></button>
+              <SidebarContent />
+            </motion.aside>
+          </>
+        )}
+      </AnimatePresence>
 
-        <div className="flex gap-1.5 md:gap-3">
-          <button onClick={() => setShowValues(!showValues)} className={`p-2.5 md:p-3 rounded-2xl border transition-all ${showValues ? 'bg-slate-50 text-slate-400 border-slate-100' : 'bg-blue-600 text-white shadow-lg'}`}>{showValues ? <Eye size={18}/> : <EyeOff size={18}/>}</button>
-          <button onClick={() => setIsSettingsOpen(true)} className="p-2.5 md:p-3 bg-slate-50 text-slate-400 rounded-2xl border border-slate-100 hover:bg-indigo-50 hover:text-indigo-600"><Settings size={18}/></button>
-        </div>
-      </header>
+      {/* --- MAIN AREA --- */}
+      <main className="flex-1 flex flex-col h-full overflow-hidden relative">
+         
+         {/* HEADER AREA */}
+         <header className="px-6 md:px-8 py-6 bg-white/80 backdrop-blur-md sticky top-0 z-30 flex justify-between items-center border-b border-slate-100">
+            <div className="lg:hidden flex items-center gap-3">
+               <button onClick={() => setIsMobileMenuOpen(true)} className="p-2 -ml-2 text-slate-600 hover:bg-slate-100 rounded-lg">
+                  <Menu size={24} />
+               </button>
+            </div>
 
-      <main className="max-w-7xl mx-auto px-4 md:px-8 py-8 w-full space-y-10 flex flex-col items-center">
-        <div className="flex justify-center w-full sticky top-[94px] z-[100]">
-          <div className="flex items-center gap-1 p-1 bg-white/95 border border-slate-200 rounded-full shadow-2xl backdrop-blur-xl max-w-full overflow-x-auto no-scrollbar">
-            {[
-              { id: 'dashboard', icon: LayoutDashboard, label: 'Painel' }, 
-              { id: 'analytics', icon: BarChart3, label: 'Estratégia' }, 
-              { id: 'transactions', icon: List, label: 'Fluxos' }, 
-              { id: 'partners', icon: Users, label: 'CRM' }, 
-              { id: 'calendar', icon: Calendar, label: 'Agenda' },
-              { id: 'referral', icon: Share2, label: 'Indicar' }
-            ].map(tab => (
-              <button key={tab.id} onClick={() => setView(tab.id as any)} className={`flex items-center gap-2 px-4 md:px-6 py-3 md:py-4 rounded-full text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${appState.view === tab.id ? 'bg-[#020617] text-white shadow-xl' : 'text-slate-400 hover:bg-slate-50'}`}>
-                <tab.icon size={14} /> <span className="hidden sm:inline">{tab.label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
+            <div className="hidden lg:block">
+               <h2 className="text-xl font-black text-slate-900 tracking-tight">Visão Geral</h2>
+               <p className="text-xs font-medium text-slate-400">Bem-vindo de volta ao comando.</p>
+            </div>
 
-        <AnimatePresence mode="wait">
-          <motion.div 
-            key={`${appState.view}-${appState.currentMonth}-${appState.currentYear}`}
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -15 }}
-            transition={{ duration: 0.4 }}
-            className="w-full"
-          >
-            {appState.view === 'dashboard' && (
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-10 w-full items-start">
-                <div className="lg:col-span-8 space-y-6 md:space-y-8">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-                    <KPIItem showValues={showValues} label="Faturamento Previsto" value={totals.fatTotal} color="text-slate-900" icon={TrendingUp} sub="Total projetado no fluxo" info="A soma de todas as receitas planejadas para este mês, independente de já terem sido recebidas. Representa seu teto de faturamento mensal." />
-                    <KPIItem showValues={showValues} label="Faturamento Real" value={totals.fatReal} color="text-emerald-600" icon={ShieldCheck} sub="O que já caiu na conta" info="Dinheiro que efetivamente entrou no seu caixa. Use isso para medir sua liquidez imediata e capacidade de pagamento." />
-                    <KPIItem showValues={showValues} label="Dívida Total" value={totals.divTotal} color="text-slate-900" icon={TrendingDown} sub="Custos fixos + Variáveis" info="A soma de todas as despesas planejadas e faturas de cartão para o período. Define seu ponto de equilíbrio operacional." />
-                    <KPIItem showValues={showValues} label="Dívida Pendente" value={totals.divPend} color="text-rose-600" icon={Clock} sub="O que falta pagar hoje" info="Compromissos financeiros que ainda não foram marcados como pagos no sistema. É o que ainda vai sair do seu bolso este mês." />
-                  </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-                    <KPIItem dual showValues={showValues} label="Saldo de Comando Real" value={totals.comandoReal} icon={Zap} special info="Sua projeção de caixa real: (Carteira Total + Receitas a Receber + Reserva Protegida) - Dívidas Pendentes." />
-                    <KPIItem showValues={showValues} label="Carteira Global" value={totals.totalCarteira} color="text-indigo-600" icon={Briefcase} sub="Liquidez Bancária" info="A soma de todos os saldos informados nos seus Bancos Ativos em tempo real. Representa o dinheiro disponível 'em mãos' nos bancos." />
-                  </div>
-                  
-                  <div className="bg-white p-6 md:p-10 rounded-[40px] md:rounded-[48px] border border-slate-100 shadow-xl flex flex-col gap-8 relative overflow-hidden">
-                     <div className="absolute top-0 right-0 p-8 md:p-12 opacity-5 text-indigo-600"><Target size={120}/></div>
-                     <div className="flex items-center justify-between relative z-10">
-                        <div className="flex items-center gap-3">
-                           <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl"><ShieldCheck size={24}/></div>
-                           <h3 className="text-lg md:text-xl font-black text-slate-900 uppercase tracking-tighter">Visão Estratégica {appState.currentMonth}</h3>
-                           <FloatingInfo title="VISÃO ESTRATÉGICA" text="Este bloco compara seu progresso real contra a meta definida. Use o percentual de atingimento para calibrar seus esforços de venda." />
-                        </div>
-                        {showValues && (
-                          <div className="text-right">
-                             <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Meta: {totals.meta.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'})}</span>
-                          </div>
-                        )}
-                     </div>
+            <div className="flex items-center gap-2 md:gap-4 bg-white p-1 rounded-full border border-slate-200 shadow-sm">
+               <button onClick={() => changeMonth(-1)} className="p-2 hover:bg-slate-50 rounded-full text-slate-400 transition-colors"><ChevronLeft size={16}/></button>
+               <div className="px-2 md:px-6 text-center min-w-[100px] md:min-w-[140px]">
+                  <span className="text-[10px] md:text-[11px] font-black uppercase tracking-widest text-slate-900 block">{appState.currentMonth}</span>
+                  <span className="text-[8px] md:text-[9px] font-bold uppercase text-indigo-500">{appState.currentYear}</span>
+               </div>
+               <button onClick={() => changeMonth(1)} className="p-2 hover:bg-slate-50 rounded-full text-slate-400 transition-colors"><ChevronRight size={16}/></button>
+            </div>
 
-                     <div className="space-y-4 relative z-10">
-                        <div className="flex justify-between items-end mb-1">
-                           <div className="flex items-center gap-2">
-                              <span className="text-[10px] md:text-[11px] font-black text-slate-900 uppercase tracking-widest">Atingimento de Meta</span>
+            <div className="flex items-center gap-3">
+               <button onClick={() => setShowValues(!showValues)} className="p-3 text-slate-400 hover:text-indigo-600 hover:bg-white rounded-full transition-all bg-slate-50 border border-slate-100">{showValues ? <Eye size={20}/> : <EyeOff size={20}/>}</button>
+            </div>
+         </header>
+
+         <div className="flex-1 overflow-y-auto p-4 md:p-8 no-scrollbar bg-slate-50">
+            <AnimatePresence mode="wait">
+               <motion.div 
+                  key={appState.view}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{ duration: 0.3 }}
+                  className="w-full max-w-[1600px] mx-auto space-y-8 pb-10"
+               >
+                  {appState.view === 'dashboard' && (
+                     <>
+                        {/* HERO CARD (CARTEIRA GLOBAL) */}
+                        <div className="w-full bg-[#0f172a] rounded-[48px] p-8 md:p-12 text-white relative overflow-hidden shadow-2xl border border-slate-800">
+                           <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-indigo-600/20 rounded-full blur-[120px] -mr-20 -mt-20 pointer-events-none"></div>
+                           
+                           <div className="relative z-10 flex flex-col lg:flex-row justify-between items-end gap-10">
+                              <div className="space-y-6">
+                                 <div className="flex items-center gap-4">
+                                    <div className="p-2.5 bg-white/10 rounded-xl backdrop-blur-sm border border-white/10"><Briefcase size={24} className="text-indigo-400"/></div>
+                                    <div className="flex items-center gap-2">
+                                       <div>
+                                          <span className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 block mb-1">Carteira Global</span>
+                                          <span className="px-3 py-1 rounded-full text-[8px] font-bold uppercase bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 tracking-widest inline-block">Integrado</span>
+                                       </div>
+                                       <FloatingInfo title="Carteira Global" text="Soma dos saldos bancários + Reserva de Emergência (Patrimônio Total)." />
+                                    </div>
+                                 </div>
+                                 <div>
+                                    <div className="text-4xl md:text-8xl font-black font-mono tracking-tighter text-white mb-2 leading-none break-all">
+                                       {showValues ? totals.totalCarteira.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'R$ •••••••'}
+                                    </div>
+                                    <p className="text-slate-400 text-sm font-medium pl-1">Patrimônio líquido consolidado em todas as contas</p>
+                                 </div>
+                              </div>
+
+                              <div className="flex flex-col md:flex-row gap-4 w-full lg:w-auto">
+                                 {/* Box 1: Disponível */}
+                                 <div className="bg-[#1e293b]/50 border border-white/10 p-6 rounded-3xl backdrop-blur-md flex-1 lg:min-w-[220px]">
+                                    <div className="flex justify-between items-start mb-2">
+                                       <span className="text-[9px] font-black uppercase tracking-widest text-emerald-400 flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.5)]"></div> Disponível (Livre)</span>
+                                       <FloatingInfo title="Disponível" text="Saldo total das contas correntes. Dinheiro livre para movimentação imediata." />
+                                    </div>
+                                    <div className="text-2xl font-black font-mono text-white tracking-tight">{showValues ? totals.disponivel.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }) : '••••'}</div>
+                                    <p className="text-[8px] text-slate-500 mt-1 uppercase font-bold tracking-wider">Para uso imediato</p>
+                                 </div>
+                                 
+                                 {/* Box 2: Reserva */}
+                                 <div className="bg-[#1e293b]/50 border border-white/10 p-6 rounded-3xl backdrop-blur-md flex-1 lg:min-w-[220px]">
+                                    <div className="flex justify-between items-start mb-2">
+                                       <span className="text-[9px] font-black uppercase tracking-widest text-blue-400 flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-blue-400 shadow-[0_0_10px_rgba(96,165,250,0.5)]"></div> Reserva Protegida</span>
+                                       <FloatingInfo title="Reserva Protegida" text="Valor guardado à parte. Soma-se ao patrimônio, mas não conta como liquidez diária." />
+                                    </div>
+                                    <div className="text-2xl font-black font-mono text-white tracking-tight">{showValues ? (currentMonthData.reservaEmergencia || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }) : '••••'}</div>
+                                    <p className="text-[8px] text-slate-500 mt-1 uppercase font-bold tracking-wider">Fundo de Emergência</p>
+                                 </div>
+                              </div>
                            </div>
-                           <span className="text-sm font-black font-mono text-indigo-600">{totals.metaProgresso.toFixed(1)}%</span>
                         </div>
-                        <div className="h-4 bg-slate-100 rounded-full overflow-hidden border border-slate-50 p-1">
-                           <div className="h-full bg-gradient-to-r from-indigo-500 to-blue-400 rounded-full transition-all duration-1000 shadow-lg" style={{ width: `${Math.min(100, totals.metaProgresso)}%` }}></div>
-                        </div>
-                        <div className="flex items-center gap-2 mt-2">
-                           <ArrowUpRight size={14} className="text-indigo-500" />
-                           <span className="text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest">Faltam <span className="text-slate-900">{showValues ? totals.gapMeta.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'}) : 'R$ •••'}</span> para bater a meta.</span>
-                        </div>
-                     </div>
-                  </div>
-                </div>
 
-                <div className="lg:col-span-4 space-y-6 md:space-y-8">
-                   <div className="bg-[#0b1221] p-6 md:p-8 rounded-[40px] md:rounded-[48px] text-white shadow-3xl border border-blue-500/20 relative overflow-hidden group">
-                      <div className="absolute top-4 right-4 z-30">
-                        <div className="bg-amber-500 text-black text-[7px] font-black px-3 py-1 rounded-full shadow-lg animate-pulse uppercase tracking-[0.2em]">
-                          PROTEGIDO
+                        {/* KPI GRID */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                           <KPIItem label="Faturamento Previsto" value={totals.fatTotal} icon={TrendingUp} color="text-blue-600" gradient="blue" showValues={showValues} info="Total projetado de entradas." />
+                           <KPIItem label="Faturamento Real" value={totals.fatReal} icon={Check} color="text-emerald-500" gradient="emerald" showValues={showValues} info="O que já caiu na conta." />
+                           <KPIItem label="Dívida Total" value={totals.divTotal} icon={TrendingDown} color="text-amber-600" gradient="amber" showValues={showValues} info="Soma de custos fixos e variáveis." />
+                           <KPIItem label="Dívida Pendente" value={totals.divPend} icon={Clock} color="text-rose-500" gradient="rose" showValues={showValues} info="Contas a pagar restante." />
                         </div>
-                      </div>
-                      <div className="flex items-center gap-4 mb-6 md:mb-8">
-                        <div className="p-4 bg-blue-500/20 rounded-[20px] md:rounded-[24px] text-blue-400 group-hover:scale-110 transition-transform"><Heart size={28} fill="currentColor"/></div>
-                        <div>
-                          <h4 className="text-[10px] font-black uppercase tracking-[0.2em]">Reserva de Emergência</h4>
-                          <span className="text-[8px] font-bold text-white/40 uppercase tracking-widest">PATRIMÔNIO BLINDADO</span>
+
+                        {/* MAIN CONTENT SPLIT */}
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+                           
+                           {/* LEFT COLUMN (2/3 Width) - WIDGETS + BANCOS */}
+                           <div className="lg:col-span-2 space-y-6">
+                              
+                              {/* WIDGETS GRID */}
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                 <ReservaWidget value={currentMonthData.reservaEmergencia} onChange={(v: number) => updateReservaEmergencia(v)} showValues={showValues} />
+                                 <ComandoWidget value={totals.comandoReal} showValues={showValues} />
+                              </div>
+
+                              {/* BANCOS SECTION */}
+                              <div className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-xl min-h-[400px]">
+                                 <div className="flex items-center justify-between mb-8 pb-6 border-b border-slate-50">
+                                    <h3 className="text-sm font-black uppercase tracking-widest text-slate-900 flex items-center gap-3">
+                                       <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg"><Landmark size={20}/></div>
+                                       Bancos Ativos
+                                    </h3>
+                                    <FloatingInfo title="BANCOS" text="Gerencie os saldos das suas contas correntes aqui. Mantenha atualizado para a Carteira Global refletir a realidade." />
+                                 </div>
+                                 <div className="space-y-4">
+                                    {currentMonthData.accounts.map(acc => (
+                                       <BankRow key={acc.id} item={acc} onUpdateBalance={(v: number) => updateAsset(acc.id, v)} showValues={showValues} />
+                                    ))}
+                                    {currentMonthData.accounts.length === 0 && (
+                                       <div className="py-16 text-center border-2 border-dashed border-slate-100 rounded-3xl flex flex-col items-center gap-4">
+                                          <div className="p-4 bg-slate-50 rounded-full text-slate-300"><Landmark size={32}/></div>
+                                          <p className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">Nenhum banco conectado</p>
+                                       </div>
+                                    )}
+                                 </div>
+                                 <div className="mt-10 pt-8 border-t border-slate-50 flex justify-between items-center bg-slate-50 p-6 rounded-3xl">
+                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total em Contas</span>
+                                    <span className="text-xl md:text-2xl font-black font-mono text-slate-900">{showValues ? totals.saldoBancos.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'R$ •••••'}</span>
+                                 </div>
+                              </div>
+                           </div>
+
+                           {/* RIGHT COLUMN (1/3 Width) - CARDS ONLY */}
+                           <div className="space-y-6">
+                              <div className="flex items-center justify-between px-2 mb-2">
+                                 <div className="flex items-center gap-3">
+                                    <CardIcon size={18} className="text-slate-400" />
+                                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Faturas & Crédito</span>
+                                 </div>
+                                 <FloatingInfo title="Faturas" text="Controle os pagamentos de cartão de crédito. Isso impacta seu fluxo de caixa futuro." />
+                              </div>
+                              {/* CARDS LIST STACKED */}
+                              <div className="space-y-4">
+                                 {currentMonthData.creditCards.map(card => (
+                                    <CreditCardCompact key={card.id} item={card} onUpdateDetail={(f: string, v: any) => updateCardDetail(card.id, f, v)} showValues={showValues} onUpdateBalance={(v: number) => updateAsset(card.id, v)} />
+                                 ))}
+                                 {currentMonthData.creditCards.length === 0 && (
+                                    <div className="bg-white p-12 rounded-[32px] border border-dashed border-slate-200 text-center flex flex-col items-center gap-4">
+                                       <CardIcon size={24} className="text-slate-300"/>
+                                       <p className="text-[9px] font-bold text-slate-300 uppercase tracking-widest">Sem cartões ativos</p>
+                                    </div>
+                                 )}
+                              </div>
+                           </div>
+
                         </div>
-                      </div>
-                      <div className="flex items-baseline justify-between bg-white/5 p-5 md:p-6 rounded-3xl border border-white/10">
-                        <input 
-                          type="number" 
-                          className="bg-transparent border-none outline-none text-2xl md:text-3xl font-black font-mono text-[#4ade80] w-full drop-shadow-[0_0_15px_rgba(74,222,128,0.3)]"
-                          value={currentMonthData.reservaEmergencia || ''}
-                          onChange={e => updateReservaEmergencia(parseFloat(e.target.value) || 0)}
-                          placeholder="0,00"
-                        />
-                        <span className="text-[10px] font-black text-white/20 ml-2">BRL</span>
-                      </div>
-                   </div>
+                     </>
+                  )}
 
-                   <div className="bg-white p-6 md:p-8 rounded-[40px] md:rounded-[48px] border border-slate-100 shadow-2xl">
-                      <div className="flex items-center justify-between mb-6 md:mb-8">
-                        <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-blue-600 flex items-center gap-2"><Landmark size={18}/> Bancos Ativos</h4>
-                        <FloatingInfo title="BANCOS ATIVOS" text="Seus saldos bancários em tempo real. Clique no valor para editar. Este dado é a base do seu Total em Carteira." />
-                      </div>
-                      <div className="space-y-4">
-                        {currentMonthData.accounts.length > 0 ? currentMonthData.accounts.map(acc => (
-                          <AssetCard key={acc.id} item={acc} showValues={showValues} onUpdateBalance={(v: number) => updateAsset(acc.id, v)} />
-                        )) : (
-                          <p className="text-[9px] font-bold text-slate-300 uppercase text-center py-4">Configure seus bancos nas configurações</p>
-                        )}
-                      </div>
-                   </div>
-                   
-                   <div className="bg-white p-6 md:p-8 rounded-[40px] md:rounded-[48px] border border-slate-100 shadow-2xl">
-                      <div className="flex items-center justify-between mb-6 md:mb-8">
-                        <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-rose-500 flex items-center gap-2"><CardIcon size={18}/> Faturas Ativas</h4>
-                        <FloatingInfo title="FATURAS DE CARTÃO" text="Gestão de gastos em crédito. PENDENTE abate o valor do seu Saldo de Comando Real, pois é uma dívida que sairá do caixa." />
-                      </div>
-                      <div className="space-y-4">
-                        {currentMonthData.creditCards.length > 0 ? currentMonthData.creditCards.map(card => (
-                          <AssetCard key={card.id} item={card} showValues={showValues} onUpdateBalance={(v: number) => updateAsset(card.id, v)} onUpdateDetail={(f: string, v: any) => updateCardDetail(card.id, f, v)} />
-                        )) : (
-                          <p className="text-[9px] font-bold text-slate-300 uppercase text-center py-4">Configure seus cartões nas configurações</p>
-                        )}
-                      </div>
-                   </div>
-                </div>
-              </div>
-            )}
-
-            {appState.view === 'transactions' && (
-              <SplitTransactionView 
-                transactions={currentMonthData.transactions} 
-                categories={appState.categories} 
-                partners={appState.partners} 
-                onToggleStatus={handleToggleStatus} 
-                onDelete={handleDeleteTransaction} 
-                onEdit={(tx) => { setEditingTransaction(tx); setIsTransactionModalOpen(true); }} 
-                onAddNew={(type) => { setEditingTransaction(undefined); setDefaultTransactionType(type); setIsTransactionModalOpen(true); }} 
-                onQuickUpdate={handleQuickUpdateTransaction} 
-                totals={totals} 
-                showValues={showValues}
-                onDuplicatePrevious={() => setIsDuplicateModalOpen(true)}
-              />
-            )}
-            {appState.view === 'analytics' && (
-              <AnalyticsView 
-                monthData={currentMonthData} 
-                allData={appState.data} // Passando todo o histórico para o relatório
-                totals={totals} 
-                userProfile={appState.userProfile} 
-              />
-            )}
-            {appState.view === 'partners' && <PartnerManager partners={appState.partners} onAdd={() => {}} onDelete={() => {}} onUpdate={() => {}} />}
-            {appState.view === 'calendar' && <CalendarView month={appState.currentMonth} year={appState.currentYear} transactions={currentMonthData.transactions} />}
-            {appState.view === 'referral' && <ReferralView userProfile={appState.userProfile} />}
-          </motion.div>
-        </AnimatePresence>
+                  {appState.view === 'transactions' && (
+                    <SplitTransactionView 
+                      transactions={currentMonthData.transactions} 
+                      categories={appState.categories} 
+                      partners={appState.partners} 
+                      onToggleStatus={handleToggleStatus} 
+                      onDelete={handleDeleteTransaction} 
+                      onEdit={(tx) => { setEditingTransaction(tx); setIsTransactionModalOpen(true); }} 
+                      onAddNew={(type) => { setEditingTransaction(undefined); setDefaultTransactionType(type); setIsTransactionModalOpen(true); }} 
+                      onQuickUpdate={handleQuickUpdateTransaction} 
+                      totals={totals} 
+                      showValues={showValues}
+                      onDuplicatePrevious={() => setIsDuplicateModalOpen(true)}
+                    />
+                  )}
+                  {appState.view === 'analytics' && (
+                    <AnalyticsView 
+                      monthData={currentMonthData} 
+                      allData={appState.data} 
+                      totals={totals} 
+                      userProfile={appState.userProfile} 
+                    />
+                  )}
+                  {appState.view === 'partners' && <PartnerManager partners={appState.partners} onAdd={() => {}} onDelete={() => {}} onUpdate={() => {}} />}
+                  {appState.view === 'calendar' && <CalendarView month={appState.currentMonth} year={appState.currentYear} transactions={currentMonthData.transactions} />}
+                  {appState.view === 'referral' && <ReferralView userProfile={appState.userProfile} />}
+               </motion.div>
+            </AnimatePresence>
+         </div>
       </main>
 
-      <SettingsModal 
-        isOpen={isSettingsOpen} 
-        onClose={() => setIsSettingsOpen(false)} 
-        userProfile={appState.userProfile} 
-        userEmail={user.email || ''} 
-        onSaveProfile={handleSaveProfile} 
-      />
-      
-      <TransactionModal 
-        isOpen={isTransactionModalOpen} 
-        onClose={() => setIsTransactionModalOpen(false)} 
-        onSave={handleSaveTransaction} 
-        categories={appState.categories} 
-        partners={appState.partners} // NOVA PROP PASSADA
-        initialData={editingTransaction} 
-        defaultMonthRef={currentMonthId} 
-        defaultType={defaultTransactionType} 
-      />
-
-      <ConfirmModal 
-        isOpen={isDuplicateModalOpen}
-        title="Duplicar Mês Anterior?"
-        message="Deseja clonar todos os lançamentos do mês passado para o período atual? Eles serão criados com status 'PENDENTE'."
-        confirmLabel="Sim, Duplicar"
-        cancelLabel="Cancelar"
-        onConfirm={handleDuplicatePreviousMonth}
-        onCancel={() => setIsDuplicateModalOpen(false)}
-        variant="info"
-      />
+      {/* MODALS */}
+      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} userProfile={appState.userProfile} userEmail={user.email || ''} onSaveProfile={handleSaveProfile} />
+      <TransactionModal isOpen={isTransactionModalOpen} onClose={() => setIsTransactionModalOpen(false)} onSave={handleSaveTransaction} categories={appState.categories} partners={appState.partners} initialData={editingTransaction} defaultMonthRef={currentMonthId} defaultType={defaultTransactionType} />
+      <ConfirmModal isOpen={isDuplicateModalOpen} title="Duplicar Mês Anterior?" message="Deseja clonar todos os lançamentos do mês passado? Eles serão criados como PENDENTES." confirmLabel="Sim, Duplicar" cancelLabel="Cancelar" onConfirm={handleDuplicatePreviousMonth} onCancel={() => setIsDuplicateModalOpen(false)} variant="info" />
     </div>
   );
 };
