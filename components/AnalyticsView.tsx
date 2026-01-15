@@ -146,7 +146,8 @@ const AnalyticsView: React.FC<Props> = ({ monthData, allData = [], totals, userP
 
   const reportRef = useRef<HTMLDivElement>(null);
 
-  const userEmail = userProfile?.email ? userProfile.email.toLowerCase() : '';
+  // Normalização do e-mail para garantir match com lista de admins
+  const userEmail = userProfile?.email ? userProfile.email.toLowerCase().trim() : '';
   const planId = userProfile?.planId || 'ESSENTIAL';
   const isAdm = ADMIN_EMAILS.includes(userEmail);
   const isMaster = planId === 'MASTER';

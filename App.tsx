@@ -67,12 +67,22 @@ const App: React.FC = () => {
             await setDoc(profileRef, newProfile);
             setProfile(newProfile);
           } else {
-            setProfile(docSnap.data() as UserProfile);
+            const loadedProfile = docSnap.data() as UserProfile;
+            // Se o email não estiver no perfil ou for diferente do auth, atualiza localmente para garantir acesso
+            if (u.email && (!loadedProfile.email || loadedProfile.email !== u.email)) {
+                loadedProfile.email = u.email;
+            }
+            setProfile(loadedProfile);
           }
 
           onSnapshot(profileRef, (snap) => {
             if (snap.exists()) {
-              setProfile(snap.data() as UserProfile);
+              const data = snap.data() as UserProfile;
+              // Sincronia de segurança para o email
+              if (u.email && (!data.email || data.email !== u.email)) {
+                 data.email = u.email;
+              }
+              setProfile(data);
             }
             // Pequeno delay para garantir que os dados renderizem antes de remover o loading
             setTimeout(() => setProfileLoading(false), 300);

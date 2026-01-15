@@ -11,10 +11,20 @@ export interface AccessResult {
 }
 
 // Administradores oficiais
-export const ADMIN_EMAILS = ['thor4tech@gmail.com', 'cleitontadeu@gmail.com', 'cleitontadeu10@gmail.com', 'baiatalitaneves@gmail.com'];
+export const ADMIN_EMAILS = [
+  'thor4tech@gmail.com', 
+  'cleitontadeu@gmail.com', 
+  'cleitontadeu10@gmail.com', 
+  'baiatalitaneves@gmail.com'
+];
 
 // Emails autorizados para funções de teste e simulação de webhooks
-export const TEST_EMAILS = ['thor4tech@gmail.com', 'cleitontadeu10@gmail.com', 'cleitontadeu@gmail.com', 'baiatalitaneves@gmail.com'];
+export const TEST_EMAILS = [
+  'thor4tech@gmail.com', 
+  'cleitontadeu10@gmail.com', 
+  'cleitontadeu@gmail.com', 
+  'baiatalitaneves@gmail.com'
+];
 
 export function checkUserAccess(profile: UserProfile | null): AccessResult {
   if (!profile) {
@@ -22,7 +32,8 @@ export function checkUserAccess(profile: UserProfile | null): AccessResult {
   }
 
   // Correção do erro TypeError: toLowerCase de undefined
-  const userEmail = (profile.email || '').toLowerCase();
+  // Normalização agressiva para evitar bloqueios indevidos por espaços ou caixa alta
+  const userEmail = (profile.email || '').toLowerCase().trim();
 
   if (userEmail && ADMIN_EMAILS.includes(userEmail)) {
     return { hasAccess: true, isTrial: false, isExpired: false, reason: 'active' };
@@ -57,7 +68,7 @@ export const KIWIFY_LINKS = {
 
 export async function testWebhookIntegration(email: string, planId: PlanId) {
   const payload = {
-    customer: { email: email.toLowerCase() },
+    customer: { email: email.toLowerCase().trim() },
     product: { product_name: `Cria Gestão - ${planId}` },
     subscription: { status: 'active', plan: { id: planId } },
     event_type: 'order_approved'
