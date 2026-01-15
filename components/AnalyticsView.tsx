@@ -5,6 +5,7 @@ import { db, auth } from '../lib/firebase';
 import { collection, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, addDoc, getDoc, setDoc } from 'firebase/firestore';
 import { HistoricoAnalises } from './IA/HistoricoAnalises';
 import { AnaliseNaming } from './IA/AnaliseNaming';
+import { ADMIN_EMAILS } from '../lib/subscription';
 import { GoogleGenAI } from "@google/genai";
 import { Bot, Zap, Clock, Shield, DollarSign, Brain, Download, Sparkles, PieChart, CalendarRange, Printer, TrendingDown, CalendarDays, ChevronDown, CheckCircle2, Lock, Crown, ScanFace, Activity, Binary, Aperture, ArrowRight } from 'lucide-react';
 import { DEFAULT_CATEGORIES } from '../constants';
@@ -147,7 +148,7 @@ const AnalyticsView: React.FC<Props> = ({ monthData, allData = [], totals, userP
 
   const userEmail = userProfile?.email ? userProfile.email.toLowerCase() : '';
   const planId = userProfile?.planId || 'ESSENTIAL';
-  const isAdm = ['thor4tech@gmail.com', 'cleitontadeu10@gmail.com'].includes(userEmail);
+  const isAdm = ADMIN_EMAILS.includes(userEmail);
   const isMaster = planId === 'MASTER';
   const isPro = planId === 'PRO';
   const isTrial = userProfile?.subscriptionStatus === 'TRIAL';
