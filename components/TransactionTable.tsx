@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
-import { BaseTransaction, Category, Partner } from '../types';
-import { Trash2, Plus, Edit3, Activity, TrendingUp, TrendingDown, GripVertical, Search, ArrowUpDown, Layers, AlertCircle, CalendarClock, CheckCircle2, Clock, Check } from 'lucide-react';
+import { BaseTransaction, Category, Partner, Situation } from '../types';
+import { Trash2, Plus, Edit3, Activity, TrendingUp, TrendingDown, GripVertical, Search, ArrowUpDown, Layers, AlertCircle, CalendarClock, CheckCircle2, Clock, Check, CalendarX } from 'lucide-react';
 import { FloatingInfo } from './FloatingInfo';
 import { format, isBefore, isSameDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale/pt-BR';
@@ -32,7 +32,7 @@ const TransactionTable: React.FC<Props> = ({ title, color, data, categories, par
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
 
-  const getCategory = (id: string) => categories.find(c => c.id === id) || categories[0] || { name: 'S/ Cat', color: 'bg-slate-100 text-slate-700', icon: '❓' };
+  const getCategory = (id: string) => categories.find(c => c.id === id) || categories[0] || { name: 'S/ Cat', icon: '❓', color: 'bg-slate-100 text-slate-700' };
   
   const formatDateLabel = (dateStr: string) => { 
     try { 
@@ -84,18 +84,20 @@ const TransactionTable: React.FC<Props> = ({ title, color, data, categories, par
 
   const formatValue = (v: number) => showValues ? v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'R$ ••••••';
 
-  // Helper para verificar atraso
   const checkStatus = (item: BaseTransaction) => {
     const today = new Date();
     today.setHours(0,0,0,0);
     const dueDate = new Date(item.dueDate + 'T00:00:00');
     
     const isPaid = item.situation === 'PAGO';
-    const isOverdue = !isPaid && isBefore(dueDate, today);
+    const isOverdueState = item.situation === 'ATRASADO';
+    // Logic for auto-detecting overdue if pending
+    const isAutoOverdue = !isPaid && isBefore(dueDate, today) && item.situation !== 'ATRASADO';
+    const isOverdue = isOverdueState || isAutoOverdue;
+    
     const isScheduled = item.situation === 'AGENDADO';
-    const isToday = isSameDay(dueDate, today);
 
-    return { isPaid, isOverdue, isScheduled, isToday };
+    return { isPaid, isOverdue, isScheduled };
   };
 
   const handleSaveValue = (id: string, e?: React.FormEvent) => {
@@ -104,8 +106,19 @@ const TransactionTable: React.FC<Props> = ({ title, color, data, categories, par
     setEditingValueId(null);
   };
 
+  const handleCycleStatus = (id: string, current: Situation) => {
+    let next: Situation = 'PENDENTE';
+    if (current === 'PENDENTE') next = 'PAGO';
+    else if (current === 'PAGO') next = 'ATRASADO';
+    else if (current === 'ATRASADO') next = 'PENDENTE';
+    else next = 'PENDENTE';
+    
+    onQuickUpdate(id, 'situation', next);
+  };
+
   return (
     <div className="bg-white rounded-[40px] md:rounded-[56px] shadow-4xl border border-slate-200 overflow-hidden flex flex-col h-full transition-all hover:shadow-5xl">
+      {/* Header do Bloco */}
       <div className={`px-6 py-8 md:px-10 md:py-10 flex flex-col md:flex-row justify-between items-center ${color} gap-6 relative overflow-hidden`}>
         <div className="absolute top-0 right-0 p-12 opacity-10 text-white rotate-12"><Activity size={100}/></div>
         
@@ -136,69 +149,83 @@ const TransactionTable: React.FC<Props> = ({ title, color, data, categories, par
         </div>
       </div>
 
-      {/* MOBILE CARD VIEW */}
-      <div className="md:hidden flex flex-col gap-3 p-4 bg-slate-50 min-h-[300px]">
+      {/* MOBILE VIEW (CARDS) */}
+      <div className="md:hidden flex flex-col gap-4 p-4 bg-slate-50 min-h-[300px]">
         {filteredAndSortedData.map((item) => {
            const cat = getCategory(item.categoryId);
            const { isPaid, isOverdue } = checkStatus(item);
            return (
-             <div key={item.id} className="bg-white p-5 rounded-[24px] shadow-sm border border-slate-100 flex flex-col gap-3 relative overflow-hidden transition-all hover:shadow-md">
-                <div className={`absolute top-0 right-0 w-2 h-full ${isPaid ? 'bg-emerald-500' : isOverdue ? 'bg-rose-500' : 'bg-amber-400'}`}></div>
+             <div key={item.id} className="bg-white p-5 rounded-[32px] shadow-sm border border-slate-100 flex flex-col gap-4 relative overflow-hidden transition-all hover:shadow-md">
+                {/* Indicador Lateral de Status */}
+                <div className={`absolute top-0 right-0 w-2 h-full transition-colors ${isPaid ? 'bg-emerald-500' : isOverdue ? 'bg-rose-500' : 'bg-amber-400'}`}></div>
                 
+                {/* Top: Categoria e Ações Rápidas */}
                 <div className="flex justify-between items-start">
-                   <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg ${cat.color.split(' ')[0]} ${cat.color.split(' ')[1]}`}>
+                   <div className="flex items-center gap-3 min-w-0">
+                      <div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-lg shrink-0 ${cat.color.split(' ')[0]} ${cat.color.split(' ')[1]}`}>
                          {cat.icon}
                       </div>
-                      <div>
-                         <h4 className="text-sm font-black text-slate-800 uppercase tracking-tight line-clamp-1">{item.description}</h4>
+                      <div className="min-w-0 flex-1">
+                         <h4 className="text-sm font-black text-slate-800 uppercase tracking-tight truncate pr-2">{item.description}</h4>
                          <span className="text-[10px] font-bold text-slate-400 uppercase">{cat.name}</span>
                       </div>
                    </div>
-                   <button onClick={() => onEdit(item)} className="p-2 text-slate-300 hover:text-indigo-600"><Edit3 size={16}/></button>
+                   <div className="flex items-center gap-1 shrink-0 bg-slate-50 rounded-2xl p-1 border border-slate-100">
+                      <button onClick={() => onEdit(item)} className="p-2 text-slate-400 hover:text-indigo-600 active:scale-90 transition-all"><Edit3 size={18}/></button>
+                      <button onClick={() => onDelete(item.id)} className="p-2 text-rose-300 hover:text-rose-600 active:scale-90 transition-all"><Trash2 size={18}/></button>
+                   </div>
                 </div>
 
-                <div className="flex items-end justify-between mt-2">
-                   <div className="flex-1">
-                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Valor</span>
-                      {editingValueId === item.id ? (
-                        <form onSubmit={(e) => handleSaveValue(item.id, e)} className="flex items-center gap-2 animate-in fade-in zoom-in">
-                           <div className="bg-slate-100 rounded-xl px-3 py-1 flex items-center border border-indigo-200">
-                              <span className="text-xs text-slate-400 font-bold mr-1">R$</span>
-                              <input 
-                                autoFocus 
-                                type="number" 
-                                inputMode="decimal"
-                                step="0.01" 
-                                className="w-24 bg-transparent outline-none font-black text-lg text-indigo-600" 
-                                value={localVal} 
-                                onChange={e => setLocalVal(e.target.value)} 
-                                onBlur={() => setTimeout(() => handleSaveValue(item.id), 200)}
-                                enterKeyHint="done"
-                              />
-                           </div>
-                           <button type="submit" className="p-2 bg-indigo-500 text-white rounded-xl shadow-lg hover:bg-indigo-600 transition-all active:scale-90">
-                              <Check size={16} strokeWidth={3} />
-                           </button>
-                        </form>
-                      ) : (
-                        <span 
-                          onClick={() => { setEditingValueId(item.id); setLocalVal(item.value.toString()); }}
-                          className={`text-lg font-black font-mono tracking-tighter cursor-pointer active:scale-95 transition-transform inline-block ${isPaid ? 'text-slate-400 line-through decoration-2' : isIncome ? 'text-emerald-600' : 'text-slate-900'}`}
-                        >
-                           {formatValue(item.value)}
-                        </span>
-                      )}
-                   </div>
-                   <div className="flex items-center gap-3">
-                      <span className={`text-[10px] font-bold font-mono ${isOverdue ? 'text-rose-500' : 'text-slate-400'}`}>{formatDateLabel(item.dueDate)}</span>
-                      <button 
-                        onClick={() => onToggleStatus(item.id)} 
-                        className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${isPaid ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-300'}`}
+                {/* Valor Centralizado e Grande (Evita Overflow) */}
+                <div className="px-1">
+                   <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Valor da Operação</span>
+                   {editingValueId === item.id ? (
+                      <form onSubmit={(e) => handleSaveValue(item.id, e)} className="flex items-center gap-2 animate-in fade-in zoom-in">
+                         <div className="bg-indigo-50/50 rounded-2xl px-4 py-2 flex items-center border-2 border-indigo-200 flex-1">
+                            <span className="text-sm text-indigo-400 font-bold mr-1">R$</span>
+                            <input 
+                              autoFocus 
+                              type="number" 
+                              inputMode="decimal"
+                              step="0.01" 
+                              className="w-full bg-transparent outline-none font-black text-2xl text-indigo-600 font-mono" 
+                              value={localVal} 
+                              onChange={e => setLocalVal(e.target.value)} 
+                              onFocus={(e) => e.target.select()}
+                              onBlur={() => setTimeout(() => handleSaveValue(item.id), 200)}
+                            />
+                         </div>
+                      </form>
+                   ) : (
+                      <div 
+                        onClick={() => { setEditingValueId(item.id); setLocalVal(item.value.toString()); }}
+                        className={`text-3xl font-black font-mono tracking-tighter cursor-pointer active:scale-95 transition-transform truncate pr-4 ${isPaid ? 'text-slate-400 line-through decoration-2' : isIncome ? 'text-emerald-600' : 'text-slate-900'}`}
                       >
-                         {isPaid ? <CheckCircle2 size={20} /> : <Clock size={20} />}
-                      </button>
+                         {formatValue(item.value)}
+                      </div>
+                   )}
+                </div>
+                
+                {/* Footer do Card: Data e Botão de Status (3 Estados) */}
+                <div className="flex items-center justify-between pt-4 border-t border-slate-50 mt-1">
+                   <div className="flex items-center gap-2">
+                      <div className={`p-2 rounded-xl ${isOverdue ? 'bg-rose-50 text-rose-500' : 'bg-slate-50 text-slate-400'}`}>
+                         <CalendarClock size={14} />
+                      </div>
+                      <span className={`text-[12px] font-black font-mono ${isOverdue ? 'text-rose-500' : 'text-slate-500'}`}>{formatDateLabel(item.dueDate)}</span>
                    </div>
+                   
+                   <button 
+                     onClick={() => handleCycleStatus(item.id, item.situation)} 
+                     className={`px-4 py-2.5 rounded-full flex items-center gap-2 transition-all border-2 shadow-sm active:scale-95 ${
+                       isPaid ? 'bg-emerald-50 border-emerald-200 text-emerald-600' : 
+                       item.situation === 'ATRASADO' ? 'bg-rose-50 border-rose-200 text-rose-600' : 
+                       'bg-amber-50 border-amber-200 text-amber-600'
+                     }`}
+                   >
+                      <span className="text-[10px] font-black uppercase tracking-widest">{isPaid ? 'PAGO' : item.situation === 'ATRASADO' ? 'ATRASADO' : 'PENDENTE'}</span>
+                      {isPaid ? <CheckCircle2 size={16} /> : item.situation === 'ATRASADO' ? <CalendarX size={16} /> : <Clock size={16} />}
+                   </button>
                 </div>
              </div>
            );
@@ -213,7 +240,7 @@ const TransactionTable: React.FC<Props> = ({ title, color, data, categories, par
 
       {/* DESKTOP TABLE VIEW */}
       <div className="hidden md:block overflow-x-auto flex-1 no-scrollbar">
-        <table className="w-full text-left border-collapse min-w-[700px] table-fixed">
+        <table className="w-full text-left border-collapse min-w-[800px] table-fixed">
           <thead className="bg-slate-50/50 text-slate-400 text-[9px] font-black uppercase tracking-[0.3em] border-b border-slate-100">
             <tr>
               <th className="px-6 py-6 w-14"></th>
@@ -223,17 +250,17 @@ const TransactionTable: React.FC<Props> = ({ title, color, data, categories, par
               <th className="px-6 py-6 cursor-pointer hover:text-indigo-600 transition-colors" onClick={() => toggleSort('description')}>
                 <div className="flex items-center gap-2">Descrição <ArrowUpDown size={10}/></div>
               </th>
-              <th className="px-6 py-6 w-40 cursor-pointer hover:text-indigo-600 transition-colors" onClick={() => toggleSort('value')}>
-                <div className="flex items-center gap-2">Valor Real <ArrowUpDown size={10}/></div>
+              <th className="px-6 py-6 w-44 cursor-pointer hover:text-indigo-600 transition-colors" onClick={() => toggleSort('value')}>
+                <div className="flex items-center gap-2">Valor <ArrowUpDown size={10}/></div>
               </th>
-              <th className="px-6 py-6 w-36 text-center">Status</th>
+              <th className="px-6 py-6 w-40 text-center">Situação</th>
               <th className="px-6 py-6 w-32 text-right">Ações</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
             {filteredAndSortedData.map((item) => {
               const cat = getCategory(item.categoryId);
-              const { isPaid, isOverdue, isScheduled, isToday } = checkStatus(item);
+              const { isPaid, isOverdue, isScheduled } = checkStatus(item);
               
               return (
                 <tr key={item.id} className={`group transition-all cursor-default ${isOverdue ? 'bg-rose-50/30' : isScheduled ? 'opacity-70' : 'hover:bg-indigo-50/20'}`}>
@@ -242,7 +269,6 @@ const TransactionTable: React.FC<Props> = ({ title, color, data, categories, par
                      <div className={`flex items-center gap-2 text-[11px] font-black font-mono tracking-tighter ${isOverdue ? 'text-rose-500' : 'text-slate-500'}`}>
                         {formatDateLabel(item.dueDate)}
                         {isOverdue && <AlertCircle size={12} className="animate-pulse" />}
-                        {isScheduled && <CalendarClock size={12} className="text-slate-400" />}
                      </div>
                   </td>
                   <td className="px-6 py-5">
@@ -267,18 +293,18 @@ const TransactionTable: React.FC<Props> = ({ title, color, data, categories, par
                           autoFocus 
                           type="number" 
                           step="0.01" 
-                          className="w-24 bg-white border-2 border-indigo-200 rounded-xl px-3 py-1 font-mono font-black text-[12px] outline-none shadow-inner" 
+                          className="w-28 bg-white border-2 border-indigo-200 rounded-xl px-3 py-1.5 font-mono font-black text-[12px] outline-none shadow-inner" 
                           value={localVal} 
                           onChange={e => setLocalVal(e.target.value)} 
+                          onFocus={(e) => e.target.select()}
                           onBlur={() => setTimeout(() => handleSaveValue(item.id), 200)}
-                          enterKeyHint="done"
                         />
-                        <button type="submit" className="p-1.5 bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white rounded-lg transition-all"><Check size={12}/></button>
+                        <button type="submit" className="p-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white rounded-lg transition-all"><Check size={14} strokeWidth={3}/></button>
                       </form>
                     ) : (
                       <div 
                         onClick={() => { setEditingValueId(item.id); setLocalVal(item.value.toString()); }} 
-                        className={`text-[13px] font-black font-mono tracking-tighter cursor-pointer px-3 py-1.5 rounded-xl border border-transparent hover:border-indigo-100 hover:bg-white hover:shadow-sm transition-all flex items-center gap-2 group/value w-fit ${isPaid ? 'text-slate-400' : item.type === 'Receita' ? 'text-emerald-600' : 'text-slate-900'}`}
+                        className={`text-[14px] font-black font-mono tracking-tighter cursor-pointer px-3 py-1.5 rounded-xl border border-transparent hover:border-indigo-100 hover:bg-white hover:shadow-sm transition-all flex items-center gap-2 group/value w-fit ${isPaid ? 'text-slate-400' : item.type === 'Receita' ? 'text-emerald-600' : 'text-slate-900'}`}
                       >
                         {formatValue(item.value || 0)}
                         <Edit3 size={10} className="opacity-0 group-hover/value:opacity-40 transition-opacity" />
@@ -287,22 +313,21 @@ const TransactionTable: React.FC<Props> = ({ title, color, data, categories, par
                   </td>
                   <td className="px-6 py-5 text-center">
                     <button 
-                      onClick={() => onToggleStatus(item.id)} 
-                      className={`px-3 py-1.5 rounded-full text-[9px] font-black border transition-all shadow-sm flex items-center justify-center gap-1 w-full max-w-[110px] mx-auto
+                      onClick={() => handleCycleStatus(item.id, item.situation)} 
+                      className={`px-3 py-2 rounded-full text-[9px] font-black border transition-all shadow-sm flex items-center justify-center gap-1.5 w-full max-w-[120px] mx-auto active:scale-95
                         ${isPaid ? 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100' : 
-                          isOverdue ? 'bg-rose-50 text-rose-600 border-rose-200 hover:bg-rose-100' :
-                          isScheduled ? 'bg-slate-50 text-slate-400 border-slate-200 border-dashed hover:bg-slate-100' :
+                          item.situation === 'ATRASADO' ? 'bg-rose-50 text-rose-600 border-rose-200 hover:bg-rose-100' :
                           'bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-100'}
                       `}
                     >
-                      {isPaid && <CheckCircle2 size={10} />}
-                      {isOverdue ? 'ATRASADO' : item.situation}
+                      {isPaid ? <CheckCircle2 size={12} /> : item.situation === 'ATRASADO' ? <CalendarX size={12} /> : <Clock size={12} />}
+                      {isPaid ? 'PAGO' : item.situation === 'ATRASADO' ? 'ATRASADO' : 'PENDENTE'}
                     </button>
                   </td>
                   <td className="px-6 py-5 text-right">
                     <div className="flex justify-end gap-2">
-                      <button onClick={() => onEdit(item)} className="p-2 bg-slate-50 text-slate-400 hover:text-indigo-600 hover:bg-white hover:shadow-md rounded-xl transition-all"><Edit3 size={14} /></button>
-                      <button onClick={() => onDelete(item.id)} className="p-2 bg-rose-50 text-rose-300 hover:text-rose-600 hover:bg-white hover:shadow-md rounded-xl transition-all"><Trash2 size={14} /></button>
+                      <button onClick={() => onEdit(item)} className="p-2.5 bg-slate-50 text-slate-400 hover:text-indigo-600 hover:bg-white hover:shadow-md rounded-xl transition-all"><Edit3 size={16} /></button>
+                      <button onClick={() => onDelete(item.id)} className="p-2.5 bg-rose-50 text-rose-300 hover:text-rose-600 hover:bg-white hover:shadow-md rounded-xl transition-all"><Trash2 size={16} /></button>
                     </div>
                   </td>
                 </tr>
@@ -310,12 +335,6 @@ const TransactionTable: React.FC<Props> = ({ title, color, data, categories, par
             })}
           </tbody>
         </table>
-        {filteredAndSortedData.length === 0 && (
-          <div className="py-20 text-center flex flex-col items-center gap-4 opacity-30">
-            <Activity size={48} className="text-slate-300" />
-            <p className="text-[10px] font-black uppercase tracking-[0.4em]">Nenhum resultado para a busca</p>
-          </div>
-        )}
       </div>
 
       <div className="bg-slate-100/50 border-t border-slate-200 p-6 md:p-10 space-y-6 md:space-y-10">

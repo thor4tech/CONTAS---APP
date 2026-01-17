@@ -1,5 +1,5 @@
 
-export type Situation = 'PAGO' | 'PENDENTE' | 'AGENDADO' | 'CANCELADO';
+export type Situation = 'PAGO' | 'PENDENTE' | 'AGENDADO' | 'ATRASADO' | 'CANCELADO';
 export type PaymentType = 'Receita' | 'Despesa';
 export type Currency = 'BRL' | 'EUR';
 export type PlanId = 'ESSENTIAL' | 'PRO' | 'MASTER';

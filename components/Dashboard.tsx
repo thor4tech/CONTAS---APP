@@ -22,9 +22,9 @@ import {
   Landmark, Zap, Settings, CreditCard as CardIcon, 
   BarChart3, Heart, TrendingDown, TrendingUp, Clock, ShieldCheck,
   Briefcase, Eye, EyeOff, Target, ArrowUpRight, Share2, Copy, Check, CalendarDays, Wallet, Building2, Lock,
-  Search, Bell, Moon, LogOut, Menu, X, Edit2
+  Search, Bell, Moon, LogOut, Menu, X, Edit2, Eraser, Trash2
 } from 'lucide-react';
-import { addMonths, subMonths, endOfMonth, isBefore, startOfMonth, getDate, setDate, lastDayOfMonth } from 'date-fns';
+import { addMonths, subMonths, endOfMonth, isBefore, startOfMonth, getDate, setDate, lastDayOfMonth, format } from 'date-fns';
 
 interface DashboardProps {
   user: any;
@@ -43,7 +43,6 @@ const SidebarItem = ({ icon: Icon, label, active, onClick }: any) => (
 );
 
 const KPIItem = ({ label, value, icon: Icon, color, showValues, info, gradient }: any) => {
-  // Configuração visual avançada para os ícones (Pseudo-3D)
   const iconStyles: any = {
     'blue': 'bg-gradient-to-br from-blue-400 to-blue-600 text-white shadow-blue-200',
     'emerald': 'bg-gradient-to-br from-emerald-400 to-emerald-600 text-white shadow-emerald-200',
@@ -72,7 +71,6 @@ const KPIItem = ({ label, value, icon: Icon, color, showValues, info, gradient }
           ) : '••••••'}
         </div>
       </div>
-      {/* Decoração de fundo sutil */}
       <div className={`absolute -right-6 -bottom-6 opacity-[0.05] ${color} scale-[2.5] pointer-events-none`}>
          <Icon size={64} />
       </div>
@@ -112,6 +110,7 @@ const BankRow = ({ item, onUpdateBalance, showValues }: any) => {
                   className="w-32 md:w-40 bg-indigo-50/30 border-b-2 border-indigo-500 rounded-lg px-2 py-1 text-right font-mono font-black text-lg outline-none text-indigo-700 transition-all placeholder:text-indigo-300"
                   value={val}
                   onChange={e => setVal(e.target.value)}
+                  onFocus={(e) => e.target.select()}
                   onBlur={() => setTimeout(handleSave, 200)}
                 />
              </form>
@@ -170,7 +169,7 @@ const CreditCardCompact = ({ item, onUpdateDetail, showValues, onUpdateBalance }
             </div>
             <button 
                onClick={() => onUpdateDetail('situation', item.situation === 'PAGO' ? 'PENDENTE' : 'PAGO')}
-               className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase border tracking-widest transition-all ${item.situation === 'PAGO' ? 'bg-emerald-500 border-emerald-400 text-white shadow-lg' : 'bg-black/20 border-white/20 text-white/50 hover:bg-black/40 hover:text-white hover:border-white/40'}`}
+               className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase border tracking-widest transition-all ${item.situation === 'PAGO' ? 'bg-emerald-50 border-emerald-400 text-white shadow-lg' : 'bg-black/20 border-white/20 text-white/50 hover:bg-black/40 hover:text-white hover:border-white/40'}`}
             >
                {item.situation}
             </button>
@@ -185,6 +184,7 @@ const CreditCardCompact = ({ item, onUpdateDetail, showValues, onUpdateBalance }
                      className="w-full bg-black/20 rounded-xl px-3 py-2 text-2xl font-mono font-black text-white outline-none border border-white/20 focus:border-white/50 transition-all shadow-inner" 
                      value={val} 
                      onChange={e => setVal(e.target.value)} 
+                     onFocus={(e) => e.target.select()}
                      onBlur={() => setTimeout(handleSave, 200)} 
                    />
                 </form>
@@ -208,6 +208,7 @@ const CreditCardCompact = ({ item, onUpdateDetail, showValues, onUpdateBalance }
                         className="w-full bg-transparent text-sm font-black text-white outline-none text-center"
                         value={dateVal}
                         onChange={e => setDateVal(e.target.value)}
+                        onFocus={(e) => e.target.select()}
                         onBlur={() => setTimeout(handleSaveDate, 200)}
                       />
                    </div>
@@ -231,7 +232,6 @@ const CreditCardCompact = ({ item, onUpdateDetail, showValues, onUpdateBalance }
 const ReservaWidget = ({ value, onChange, showValues }: any) => {
   return (
     <div className="bg-gradient-to-br from-[#0f172a] via-[#1e293b] to-[#0f172a] p-8 rounded-[32px] text-white shadow-2xl relative overflow-hidden group border border-slate-800 ring-1 ring-white/5">
-      {/* Background decoration 3D effect */}
       <div className="absolute top-0 right-0 p-16 opacity-[0.03] text-white rotate-12 pointer-events-none transition-transform group-hover:scale-110 duration-700">
          <ShieldCheck size={120}/>
       </div>
@@ -246,7 +246,6 @@ const ReservaWidget = ({ value, onChange, showValues }: any) => {
                <span className="text-[9px] text-emerald-500 font-bold uppercase tracking-widest animate-pulse">● Blindado</span>
             </div>
             
-            {/* Ícone 3D Melhorado */}
             <div className="p-4 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-2xl text-white shadow-[0_10px_20px_rgba(16,185,129,0.3)] ring-2 ring-white/20 transform group-hover:scale-110 transition-transform duration-500 flex items-center justify-center">
                <ShieldCheck size={26} strokeWidth={2.5} className="drop-shadow-md" />
             </div>
@@ -260,6 +259,7 @@ const ReservaWidget = ({ value, onChange, showValues }: any) => {
                className="bg-transparent border-none outline-none text-3xl md:text-4xl font-black font-mono text-white w-full placeholder:text-slate-800 p-0 focus:ring-0 z-10 text-shadow-lg"
                value={value || ''}
                onChange={e => onChange(parseFloat(e.target.value) || 0)}
+               onFocus={(e) => e.target.select()}
                placeholder="0,00"
             />
          </div>
@@ -317,11 +317,15 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
   const [showValues, setShowValues] = useState(true);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isDuplicateModalOpen, setIsDuplicateModalOpen] = useState(false);
+  const [isClearModalOpen, setIsClearModalOpen] = useState(false);
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false); // Novo estado para mobile menu
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<BaseTransaction | undefined>(undefined);
   const [defaultTransactionType, setDefaultTransactionType] = useState<'Receita' | 'Despesa'>('Despesa');
   
+  // Novo estado para exclusão com pop-up
+  const [transactionToDeleteId, setTransactionToDeleteId] = useState<string | null>(null);
+
   const [appState, setAppState] = useState<AppState>({
     currentMonth: MONTHS[new Date().getMonth()],
     currentYear: new Date().getFullYear(),
@@ -350,7 +354,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
   const setView = (newView: any) => {
     setAppState(p => ({ ...p, view: newView }));
     window.history.pushState({ view: newView }, '', '');
-    setIsMobileMenuOpen(false); // Fecha menu mobile ao navegar
+    setIsMobileMenuOpen(false);
   };
 
   useEffect(() => {
@@ -366,43 +370,17 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
         if (profile.onboardingCompleto === false) setAppState(p => ({ ...p, view: 'onboarding' }));
       }
     });
-    onSnapshot(query(collection(db, `users/${user.uid}/data`)), snap => setAppState(p => ({ ...p, data: snap.docs.map(d => d.data() as FinancialData) })));
+    onSnapshot(query(collection(db, `users/${user.uid}/data`)), snap => {
+        setAppState(p => ({ ...p, data: snap.docs.map(d => ({...d.data(), docId: d.id}) as FinancialData) }));
+    });
     onSnapshot(query(collection(db, `users/${user.uid}/partners`)), snap => setAppState(p => ({ ...p, partners: snap.docs.map(d => d.data() as Partner) })));
   }, [user?.uid]);
 
   const currentMonthId = `${appState.currentYear}-${(MONTHS.indexOf(appState.currentMonth) + 1).toString().padStart(2, '0')}`;
   
-  useEffect(() => {
-    const checkAndRollover = async () => {
-      if (!user?.uid || appState.data.length === 0) return;
-      const currentMonthIndex = MONTHS.indexOf(appState.currentMonth);
-      const prevDate = subMonths(new Date(appState.currentYear, currentMonthIndex), 1);
-      const prevMonthId = `${prevDate.getFullYear()}-${(prevDate.getMonth() + 1).toString().padStart(2, '0')}`;
-      const prevData = appState.data.find(d => `${d.year}-${(MONTHS.indexOf(d.month) + 1).toString().padStart(2, '0')}` === prevMonthId);
-      if (!prevData || !prevData.transactions) return;
-      const pendingFromLastMonth = prevData.transactions.filter(t => t.situation === 'PENDENTE');
-      if (pendingFromLastMonth.length > 0) {
-        const newPrevTransactions = prevData.transactions.filter(t => t.situation !== 'PENDENTE');
-        const currentData = appState.data.find(d => `${d.year}-${(MONTHS.indexOf(d.month) + 1).toString().padStart(2, '0')}` === currentMonthId);
-        const rolledOverTransactions = pendingFromLastMonth.map(t => {
-          const originalDay = parseInt(t.dueDate.split('-')[2]);
-          const targetDate = setDate(new Date(appState.currentYear, currentMonthIndex), Math.min(originalDay, getDate(lastDayOfMonth(new Date(appState.currentYear, currentMonthIndex)))));
-          return { ...t, monthRef: currentMonthId, dueDate: targetDate.toISOString().split('T')[0], description: `${t.description} (Rolagem)` };
-        });
-        try {
-          await setDoc(doc(db, `users/${user.uid}/data`, prevMonthId), { ...prevData, transactions: newPrevTransactions }, { merge: true });
-          const newCurrentTransactions = [...(currentData?.transactions || []), ...rolledOverTransactions];
-          const baseCurrentData = currentData || { ...INITIAL_DATA, year: appState.currentYear, month: appState.currentMonth };
-          await setDoc(doc(db, `users/${user.uid}/data`, currentMonthId), { ...baseCurrentData, transactions: newCurrentTransactions }, { merge: true });
-        } catch (error) { console.error("Erro na rolagem automática:", error); }
-      }
-    };
-    const timer = setTimeout(() => { checkAndRollover(); }, 2000);
-    return () => clearTimeout(timer);
-  }, [currentMonthId, appState.data]);
-
   const currentMonthData = useMemo(() => {
     const found = appState.data.find(d => `${d.year}-${(MONTHS.indexOf(d.month) + 1).toString().padStart(2, '0')}` === currentMonthId);
+    
     const completeData: FinancialData = {
       month: found?.month || appState.currentMonth,
       year: found?.year || appState.currentYear,
@@ -414,6 +392,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
       balances: found?.balances || {},
       cardDetails: found?.cardDetails || {}
     };
+
     const assets = appState.userProfile.globalAssets || [];
     return {
       ...completeData,
@@ -436,22 +415,13 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
     const divPend = txs.filter(t => t.type === 'Despesa' && t.situation !== 'PAGO').reduce((a, t) => a + (t.value || 0), 0) + 
                   currentMonthData.creditCards.filter(c => c.situation !== 'PAGO').reduce((a, c) => a + (c.balance || 0), 0);
     
-    // NOVO CÁLCULO: Reserva é um ativo à parte (conta investimento)
     const saldoBancos = currentMonthData.accounts.reduce((a, b) => a + (b.balance || 0), 0);
     const res = currentMonthData.reservaEmergencia || 0;
-    
-    // Carteira Global = Saldo em Bancos + Reserva (Patrimônio Total)
     const totalCarteira = saldoBancos + res;
-    
-    // Disponível = Apenas Saldo em Bancos (Liquidez Imediata, já que reserva está separada)
     const disponivel = saldoBancos;
-    
     const meta = appState.userProfile.defaultMeta || 0;
     
-    // Projeções
-    // Com Reserva = Patrimônio Total Projetado
     const comReserva = totalCarteira + fatPend - divPend;
-    // Sem Reserva = Liquidez Projetada
     const semReserva = disponivel + fatPend - divPend;
 
     const metaProgresso = meta > 0 ? (fatReal / meta) * 100 : 0;
@@ -460,7 +430,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
     return { 
       fatTotal, fatReal, fatPend, divTotal, divPend, 
       totalCarteira, 
-      saldoBancos, // Exportando para usar na lista de bancos
+      saldoBancos,
       meta, metaProgresso, gapMeta,
       comandoReal: { comReserva, semReserva },
       reserva: res,
@@ -505,44 +475,67 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
     const txs = [...(currentMonthData.transactions || [])];
     const idx = txs.findIndex(t => t.id === id);
     if (idx !== -1) {
-      txs[idx] = { ...txs[idx], situation: txs[idx].situation === 'PAGO' ? 'PENDENTE' : 'PAGO' };
+      const current = txs[idx].situation;
+      let next: Situation = 'PENDENTE';
+      if (current === 'PENDENTE') next = 'PAGO';
+      else if (current === 'PAGO') next = 'ATRASADO';
+      else if (current === 'ATRASADO') next = 'PENDENTE';
+      else next = 'PENDENTE';
+      
+      txs[idx] = { ...txs[idx], situation: next };
       await setDoc(doc(db, `users/${user.uid}/data`, currentMonthId), { ...currentMonthData, transactions: txs }, { merge: true });
     }
   };
 
-  const handleDeleteTransaction = async (id: string) => {
-    if (!confirm("Confirmar exclusão deste lançamento?")) return;
-    const txs = (currentMonthData.transactions || []).filter(t => t.id !== id);
+  const handleDeleteTransaction = async () => {
+    if (!transactionToDeleteId) return;
+    const txs = (currentMonthData.transactions || []).filter(t => t.id !== transactionToDeleteId);
     await setDoc(doc(db, `users/${user.uid}/data`, currentMonthId), { ...currentMonthData, transactions: txs }, { merge: true });
+    setTransactionToDeleteId(null);
+  };
+
+  const handleClearMonth = async () => {
+    await setDoc(doc(db, `users/${user.uid}/data`, currentMonthId), { ...currentMonthData, transactions: [] }, { merge: true });
+    setIsClearModalOpen(false);
   };
 
   const handleSaveTransaction = async (transactions: BaseTransaction[]) => {
     if (transactions.length === 0) return;
     const updatesByMonth: Record<string, BaseTransaction[]> = {};
+    
     transactions.forEach(tx => {
        const date = new Date(tx.dueDate + 'T00:00:00');
-       const monthId = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
-       const txWithCorrectMonth = { ...tx, monthRef: monthId };
-       if (!updatesByMonth[monthId]) updatesByMonth[monthId] = [];
-       updatesByMonth[monthId].push(txWithCorrectMonth);
+       const mId = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
+       const txWithCorrectMonth = { ...tx, monthRef: mId };
+       if (!updatesByMonth[mId]) updatesByMonth[mId] = [];
+       updatesByMonth[mId].push(txWithCorrectMonth);
     });
-    for (const [monthId, newTxs] of Object.entries(updatesByMonth)) {
-       const docRef = doc(db, `users/${user.uid}/data`, monthId);
+
+    for (const [mId, newTxs] of Object.entries(updatesByMonth)) {
+       const docRef = doc(db, `users/${user.uid}/data`, mId);
        const docSnap = await getDoc(docRef);
-       let existingData: FinancialData;
+       
+       let monthDataToUpdate: FinancialData;
        if (docSnap.exists()) {
-          existingData = docSnap.data() as FinancialData;
+          monthDataToUpdate = docSnap.data() as FinancialData;
        } else {
-          const [yearStr, monthNumStr] = monthId.split('-');
-          existingData = { ...INITIAL_DATA, year: parseInt(yearStr), month: MONTHS[parseInt(monthNumStr) - 1] };
+          const [yearStr, monthNumStr] = mId.split('-');
+          monthDataToUpdate = { 
+            ...INITIAL_DATA, 
+            year: parseInt(yearStr), 
+            month: MONTHS[parseInt(monthNumStr) - 1],
+            transactions: []
+          };
        }
-       let updatedTransactions = [...(existingData.transactions || [])];
+
+       let updatedTransactions = [...(monthDataToUpdate.transactions || [])];
        newTxs.forEach(newTx => {
           const index = updatedTransactions.findIndex(t => t.id === newTx.id);
           if (index !== -1) updatedTransactions[index] = newTx;
           else updatedTransactions.push(newTx);
        });
-       await setDoc(docRef, { ...existingData, transactions: updatedTransactions }, { merge: true });
+
+       await setDoc(docRef, { ...monthDataToUpdate, transactions: updatedTransactions }, { merge: true });
     }
   };
 
@@ -585,7 +578,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
     await setDoc(doc(db, `users/${user.uid}/profile`, 'settings'), profile);
   };
 
-  // --- MENU LATERAL (DESKTOP E MOBILE) ---
   const SidebarContent = () => (
     <>
       <div className="p-8">
@@ -620,12 +612,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
 
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden font-inter">
-      {/* --- SIDEBAR DESKTOP --- */}
       <aside className="hidden lg:flex w-72 bg-white border-r border-slate-100 flex-col justify-between z-20 shadow-xl">
          <SidebarContent />
       </aside>
 
-      {/* --- SIDEBAR MOBILE (OVERLAY) --- */}
       <AnimatePresence>
         {isMobileMenuOpen && (
           <>
@@ -650,10 +640,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
         )}
       </AnimatePresence>
 
-      {/* --- MAIN AREA --- */}
       <main className="flex-1 flex flex-col h-full overflow-hidden relative">
-         
-         {/* HEADER AREA */}
          <header className="px-6 md:px-8 py-6 bg-white/80 backdrop-blur-md sticky top-0 z-30 flex justify-between items-center border-b border-slate-100">
             <div className="lg:hidden flex items-center gap-3">
                <button onClick={() => setIsMobileMenuOpen(true)} className="p-2 -ml-2 text-slate-600 hover:bg-slate-100 rounded-lg">
@@ -692,7 +679,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                >
                   {appState.view === 'dashboard' && (
                      <>
-                        {/* HERO CARD (CARTEIRA GLOBAL) */}
                         <div className="w-full bg-[#0f172a] rounded-[48px] p-8 md:p-12 text-white relative overflow-hidden shadow-2xl border border-slate-800">
                            <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-indigo-600/20 rounded-full blur-[120px] -mr-20 -mt-20 pointer-events-none"></div>
                            
@@ -717,7 +703,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                               </div>
 
                               <div className="flex flex-col md:flex-row gap-4 w-full lg:w-auto">
-                                 {/* Box 1: Disponível */}
                                  <div className="bg-[#1e293b]/50 border border-white/10 p-6 rounded-3xl backdrop-blur-md flex-1 lg:min-w-[220px]">
                                     <div className="flex justify-between items-start mb-2">
                                        <span className="text-[9px] font-black uppercase tracking-widest text-emerald-400 flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.5)]"></div> Disponível (Livre)</span>
@@ -727,7 +712,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                                     <p className="text-[8px] text-slate-500 mt-1 uppercase font-bold tracking-wider">Para uso imediato</p>
                                  </div>
                                  
-                                 {/* Box 2: Reserva */}
                                  <div className="bg-[#1e293b]/50 border border-white/10 p-6 rounded-3xl backdrop-blur-md flex-1 lg:min-w-[220px]">
                                     <div className="flex justify-between items-start mb-2">
                                        <span className="text-[9px] font-black uppercase tracking-widest text-blue-400 flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-blue-400 shadow-[0_0_10px_rgba(96,165,250,0.5)]"></div> Reserva Protegida</span>
@@ -740,7 +724,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                            </div>
                         </div>
 
-                        {/* KPI GRID */}
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                            <KPIItem label="Faturamento Previsto" value={totals.fatTotal} icon={TrendingUp} color="text-blue-600" gradient="blue" showValues={showValues} info="Total projetado de entradas." />
                            <KPIItem label="Faturamento Real" value={totals.fatReal} icon={Check} color="text-emerald-500" gradient="emerald" showValues={showValues} info="O que já caiu na conta." />
@@ -748,19 +731,13 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                            <KPIItem label="Dívida Pendente" value={totals.divPend} icon={Clock} color="text-rose-500" gradient="rose" showValues={showValues} info="Contas a pagar restante." />
                         </div>
 
-                        {/* MAIN CONTENT SPLIT */}
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-                           
-                           {/* LEFT COLUMN (2/3 Width) - WIDGETS + BANCOS */}
                            <div className="lg:col-span-2 space-y-6">
-                              
-                              {/* WIDGETS GRID */}
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                  <ReservaWidget value={currentMonthData.reservaEmergencia} onChange={(v: number) => updateReservaEmergencia(v)} showValues={showValues} />
                                  <ComandoWidget value={totals.comandoReal} showValues={showValues} />
                               </div>
 
-                              {/* BANCOS SECTION */}
                               <div className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-xl min-h-[400px]">
                                  <div className="flex items-center justify-between mb-8 pb-6 border-b border-slate-50">
                                     <h3 className="text-sm font-black uppercase tracking-widest text-slate-900 flex items-center gap-3">
@@ -787,7 +764,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                               </div>
                            </div>
 
-                           {/* RIGHT COLUMN (1/3 Width) - CARDS ONLY */}
                            <div className="space-y-6">
                               <div className="flex items-center justify-between px-2 mb-2">
                                  <div className="flex items-center gap-3">
@@ -796,7 +772,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                                  </div>
                                  <FloatingInfo title="Faturas" text="Controle os pagamentos de cartão de crédito. Isso impacta seu fluxo de caixa futuro." />
                               </div>
-                              {/* CARDS LIST STACKED */}
                               <div className="space-y-4">
                                  {currentMonthData.creditCards.map(card => (
                                     <CreditCardCompact key={card.id} item={card} onUpdateDetail={(f: string, v: any) => updateCardDetail(card.id, f, v)} showValues={showValues} onUpdateBalance={(v: number) => updateAsset(card.id, v)} />
@@ -820,13 +795,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                       categories={appState.categories} 
                       partners={appState.partners} 
                       onToggleStatus={handleToggleStatus} 
-                      onDelete={handleDeleteTransaction} 
+                      onDelete={(id) => setTransactionToDeleteId(id)} 
                       onEdit={(tx) => { setEditingTransaction(tx); setIsTransactionModalOpen(true); }} 
                       onAddNew={(type) => { setEditingTransaction(undefined); setDefaultTransactionType(type); setIsTransactionModalOpen(true); }} 
                       onQuickUpdate={handleQuickUpdateTransaction} 
                       totals={totals} 
                       showValues={showValues}
                       onDuplicatePrevious={() => setIsDuplicateModalOpen(true)}
+                      onClearMonth={() => setIsClearModalOpen(true)}
                     />
                   )}
                   {appState.view === 'analytics' && (
@@ -846,9 +822,34 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
       </main>
 
       {/* MODALS */}
-      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} userProfile={appState.userProfile} userEmail={user.email || ''} onSaveProfile={handleSaveProfile} />
-      <TransactionModal isOpen={isTransactionModalOpen} onClose={() => setIsTransactionModalOpen(false)} onSave={handleSaveTransaction} categories={appState.categories} partners={appState.partners} initialData={editingTransaction} defaultMonthRef={currentMonthId} defaultType={defaultTransactionType} />
+      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} userProfile={appState.view === 'onboarding' ? ({} as UserProfile) : appState.userProfile} userEmail={user.email || ''} onSaveProfile={handleSaveProfile} />
+      
+      <TransactionModal 
+        isOpen={isTransactionModalOpen} 
+        onClose={() => setIsTransactionModalOpen(false)} 
+        onSave={handleSaveTransaction} 
+        onDelete={(id) => setTransactionToDeleteId(id)} 
+        categories={appState.categories} 
+        partners={appState.partners} 
+        initialData={editingTransaction} 
+        defaultMonthRef={currentMonthId} 
+        defaultType={defaultTransactionType} 
+      />
+
+      <ConfirmModal 
+        isOpen={transactionToDeleteId !== null} 
+        title="Excluir Lançamento?" 
+        message="Esta operação é permanente. Deseja realmente remover este registro do seu fluxo?" 
+        confirmLabel="Sim, Excluir" 
+        cancelLabel="Manter Registro" 
+        onConfirm={handleDeleteTransaction} 
+        onCancel={() => setTransactionToDeleteId(null)} 
+        variant="danger" 
+      />
+
       <ConfirmModal isOpen={isDuplicateModalOpen} title="Duplicar Mês Anterior?" message="Deseja clonar todos os lançamentos do mês passado? Eles serão criados como PENDENTES." confirmLabel="Sim, Duplicar" cancelLabel="Cancelar" onConfirm={handleDuplicatePreviousMonth} onCancel={() => setIsDuplicateModalOpen(false)} variant="info" />
+      
+      <ConfirmModal isOpen={isClearModalOpen} title="Limpar Tudo?" message="Deseja apagar TODOS os fluxos de entrada e saída deste mês? Esta ação é irreversível." confirmLabel="Sim, Apagar Tudo" cancelLabel="Cancelar" onConfirm={handleClearMonth} onCancel={() => setIsClearModalOpen(false)} variant="danger" />
     </div>
   );
 };

@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { BaseTransaction, Category, Partner } from '../types';
 import TransactionTable from './TransactionTable';
-import { Copy } from 'lucide-react';
+import { Copy, Eraser } from 'lucide-react';
 
 interface Props {
   transactions: BaseTransaction[];
@@ -17,9 +17,10 @@ interface Props {
   onReorder?: (newData: BaseTransaction[]) => void;
   showValues?: boolean;
   onDuplicatePrevious?: () => void;
+  onClearMonth?: () => void;
 }
 
-const SplitTransactionView: React.FC<Props> = ({ transactions, categories, partners, onToggleStatus, onDelete, onEdit, onAddNew, onQuickUpdate, totals, onReorder, showValues = true, onDuplicatePrevious }) => {
+const SplitTransactionView: React.FC<Props> = ({ transactions, categories, partners, onToggleStatus, onDelete, onEdit, onAddNew, onQuickUpdate, totals, onReorder, showValues = true, onDuplicatePrevious, onClearMonth }) => {
   const [activeView, setActiveView] = useState<'both' | 'income' | 'expense'>('both');
   
   const incomes = transactions.filter(t => t.type === 'Receita');
@@ -37,7 +38,7 @@ const SplitTransactionView: React.FC<Props> = ({ transactions, categories, partn
   return (
     <div className="space-y-8 animate-in fade-in duration-500 w-full max-w-full pb-10">
       {/* Sticky Header Control */}
-      <div className="flex flex-col md:flex-row gap-6 justify-center items-center sticky top-0 z-20 bg-slate-50/90 backdrop-blur-md py-4 border-b border-slate-200/50 -mx-4 px-4 md:mx-0 md:px-0 md:border-none md:bg-transparent md:backdrop-blur-none">
+      <div className="flex flex-col md:flex-row gap-4 md:gap-6 justify-center items-center sticky top-0 z-20 bg-slate-50/90 backdrop-blur-md py-4 border-b border-slate-200/50 -mx-4 px-4 md:mx-0 md:px-0 md:border-none md:bg-transparent md:backdrop-blur-none">
         <div className="flex p-1 bg-white border border-slate-200 rounded-full shadow-lg w-full max-w-[340px] md:max-w-md">
            <button 
              onClick={() => setActiveView('income')} 
@@ -59,14 +60,24 @@ const SplitTransactionView: React.FC<Props> = ({ transactions, categories, partn
            </button>
         </div>
 
-        {onDuplicatePrevious && (
-          <button 
-            onClick={onDuplicatePrevious}
-            className="hidden md:flex items-center gap-3 px-6 py-3 bg-white border border-indigo-100 text-indigo-600 rounded-full text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-indigo-50 hover:scale-105 active:scale-95 transition-all"
-          >
-            <Copy size={14} /> Duplicar Anterior
-          </button>
-        )}
+        <div className="flex items-center gap-3">
+           {onDuplicatePrevious && (
+             <button 
+               onClick={onDuplicatePrevious}
+               className="flex items-center gap-3 px-6 py-3 bg-white border border-indigo-100 text-indigo-600 rounded-full text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-indigo-50 hover:scale-105 active:scale-95 transition-all"
+             >
+               <Copy size={14} /> <span className="hidden md:inline">Duplicar Anterior</span>
+             </button>
+           )}
+           {onClearMonth && (
+             <button 
+               onClick={onClearMonth}
+               className="flex items-center gap-3 px-6 py-3 bg-white border border-rose-100 text-rose-500 rounded-full text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-rose-50 hover:scale-105 active:scale-95 transition-all"
+             >
+               <Eraser size={14} /> <span className="hidden md:inline">Limpar Mês</span>
+             </button>
+           )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-12 w-full">

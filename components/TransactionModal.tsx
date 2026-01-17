@@ -1,13 +1,14 @@
 
 import React, { useState, useEffect } from 'react';
 import { BaseTransaction, Category, Situation, Partner, SplitItem, TransactionFrequency } from '../types';
-import { X, Save, Zap, Users, Layers, Plus, Trash2, AlertCircle, CalendarRange, Repeat, CheckCircle2, ArrowRight } from 'lucide-react';
+import { X, Save, Zap, Users, Layers, Plus, Trash2, AlertCircle, CalendarRange, Repeat, CheckCircle2, ArrowRight, CalendarX, Clock } from 'lucide-react';
 import { addMonths, format } from 'date-fns';
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
   onSave: (transactions: BaseTransaction[]) => void;
+  onDelete?: (id: string) => void;
   categories: Category[];
   partners?: Partner[];
   initialData?: BaseTransaction;
@@ -15,7 +16,7 @@ interface Props {
   defaultType?: 'Receita' | 'Despesa';
 }
 
-const TransactionModal: React.FC<Props> = ({ isOpen, onClose, onSave, categories, partners = [], initialData, defaultMonthRef, defaultType }) => {
+const TransactionModal: React.FC<Props> = ({ isOpen, onClose, onSave, onDelete, categories, partners = [], initialData, defaultMonthRef, defaultType }) => {
   const getInitialState = () => ({
     id: Math.random().toString(36).substr(2, 9),
     description: '',
@@ -59,7 +60,6 @@ const TransactionModal: React.FC<Props> = ({ isOpen, onClose, onSave, categories
     }
   }, [isOpen, initialData, defaultMonthRef, defaultType]);
 
-  // Validação em tempo real do Split
   const totalSplitValue = formData.splitItems?.reduce((acc, item) => acc + (item.value || 0), 0) || 0;
   const remainingValue = (formData.value || 0) - totalSplitValue;
   const isSplitValid = Math.abs(remainingValue) < 0.01;
@@ -78,7 +78,7 @@ const TransactionModal: React.FC<Props> = ({ isOpen, onClose, onSave, categories
     e.preventDefault();
     
     if (formData.isSplit && !isSplitValid) {
-      alert("O valor total da transação não bate com a soma dos itens detalhados. Ajuste os valores.");
+      alert("O valor total da transação não bate com a soma dos itens detalhados.");
       return;
     }
 
@@ -86,27 +86,20 @@ const TransactionModal: React.FC<Props> = ({ isOpen, onClose, onSave, categories
     const groupId = initialData?.groupId || Math.random().toString(36).substr(2, 9);
 
     if (formData.frequency === 'INSTALLMENT' && !initialData) {
-      // GERAÇÃO DE PARCELAS (Somente se for criação nova, edição trata apenas a parcela atual por enquanto)
       const count = formData.installmentTotal || 2;
-      const baseValue = formData.value; // Valor de CADA parcela (comumente o usuário lança o valor da parcela, ou total? Assumindo valor da parcela aqui para simplificar UX de 'R$ 1000 em 5x')
-      
-      // UX Decision: O valor no input é o valor DA PARCELA.
-      // Se quiser que seja o valor total dividido, teríamos que dividir aqui. 
-      // Vamos manter: O valor digitado é o valor que impacta o mês (valor da parcela).
-      
-      const startDate = new Date(formData.dueDate + 'T00:00:00');
+      const startDate = new Date(formData.dueDate + 'T12:00:00');
 
       for (let i = 0; i < count; i++) {
         const installmentDate = addMonths(startDate, i);
-        const monthRefStr = `${installmentDate.getFullYear()}-${(installmentDate.getMonth() + 1).toString().padStart(2, '0')}`;
+        const monthRefStr = format(installmentDate, 'yyyy-MM');
         
         transactionsToSave.push({
           ...formData,
-          id: i === 0 ? formData.id : Math.random().toString(36).substr(2, 9), // Mantém ID na primeira
+          id: i === 0 ? formData.id : Math.random().toString(36).substr(2, 9),
           description: `${formData.description} (${i + 1}/${count})`,
-          dueDate: installmentDate.toISOString().split('T')[0],
+          dueDate: format(installmentDate, 'yyyy-MM-dd'),
           monthRef: monthRefStr,
-          situation: i === 0 ? formData.situation : 'AGENDADO', // Futuras nascem agendadas
+          situation: i === 0 ? formData.situation : 'AGENDADO',
           installmentNumber: i + 1,
           installmentTotal: count,
           groupId: groupId,
@@ -114,10 +107,12 @@ const TransactionModal: React.FC<Props> = ({ isOpen, onClose, onSave, categories
         });
       }
     } else {
-      // Única ou Recorrente (Recorrente salva como única com flag, o sistema backend/job futuro cuidaria de clonar, ou clonamos mês a mês. 
-      // Por simplicidade do MVP Frontend-only, Recorrente salva 1 item com a flag isRecurring true).
+      const selectedDate = new Date(formData.dueDate + 'T12:00:00');
+      const correctMonthRef = format(selectedDate, 'yyyy-MM');
+
       transactionsToSave.push({
         ...formData,
+        monthRef: correctMonthRef,
         isRecurring: formData.frequency === 'RECURRING',
         groupId: groupId
       });
@@ -127,7 +122,6 @@ const TransactionModal: React.FC<Props> = ({ isOpen, onClose, onSave, categories
     onClose();
   };
 
-  // Funções do Motor de Split
   const addSplitItem = () => {
     const newItem: SplitItem = {
       id: Math.random().toString(36).substr(2, 9),
@@ -155,6 +149,13 @@ const TransactionModal: React.FC<Props> = ({ isOpen, onClose, onSave, categories
     });
   };
 
+  const handleDeleteSelf = () => {
+    if (initialData && onDelete) {
+       onDelete(initialData.id);
+       onClose();
+    }
+  };
+
   const filteredPartners = partners.filter(p => 
     formData.type === 'Receita' ? p.type === 'Cliente' : p.type === 'Fornecedor'
   );
@@ -162,9 +163,8 @@ const TransactionModal: React.FC<Props> = ({ isOpen, onClose, onSave, categories
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 md:p-6 bg-slate-900/40 backdrop-blur-md animate-in fade-in duration-300">
-      <div className="bg-white rounded-[40px] md:rounded-[48px] w-full max-w-2xl max-h-[95vh] overflow-y-auto shadow-4xl border border-slate-100 flex flex-col transform animate-in zoom-in-95 duration-300">
+      <div className="bg-white rounded-[40px] md:rounded-[48px] w-full max-w-2xl max-h-[95vh] overflow-y-auto shadow-4xl border border-slate-100 flex flex-col transform animate-in zoom-in-95 duration-300 no-scrollbar">
         
-        {/* Header */}
         <div className="px-6 md:px-10 py-6 md:py-8 border-b border-slate-100 flex justify-between items-center sticky top-0 bg-white/95 backdrop-blur-sm z-20">
           <div className="flex items-center gap-4">
              <div className={`p-3 rounded-2xl ${formData.type === 'Receita' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
@@ -182,8 +182,6 @@ const TransactionModal: React.FC<Props> = ({ isOpen, onClose, onSave, categories
         
         <form onSubmit={handleSubmit} className="p-6 md:p-10 space-y-8 md:space-y-10">
           <div className="space-y-6 md:space-y-8">
-            
-            {/* Campos Principais */}
             <div className="space-y-3">
               <label className="block text-[10px] md:text-[11px] font-black text-slate-400 uppercase tracking-widest px-2">Descrição da Operação</label>
               <input 
@@ -209,6 +207,7 @@ const TransactionModal: React.FC<Props> = ({ isOpen, onClose, onSave, categories
                     step="0.01"
                     value={formData.value || ''}
                     onChange={e => setFormData({...formData, value: parseFloat(e.target.value) || 0})}
+                    onFocus={(e) => e.target.select()}
                     className="w-full bg-transparent outline-none font-black text-2xl md:text-3xl text-indigo-700 font-mono tracking-tighter"
                     placeholder="0,00"
                   />
@@ -243,104 +242,6 @@ const TransactionModal: React.FC<Props> = ({ isOpen, onClose, onSave, categories
               </select>
             </div>
 
-            {/* SEÇÃO DE SPLIT (Motor da Etapa 2) */}
-            <div className="bg-slate-50 rounded-[32px] border border-slate-200 overflow-hidden transition-all duration-500">
-               <div className="p-6 md:p-8 flex items-center justify-between bg-white border-b border-slate-100">
-                  <div className="flex items-center gap-4">
-                     <div className={`p-2.5 rounded-xl ${formData.isSplit ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-400'}`}>
-                        <Layers size={20} />
-                     </div>
-                     <div>
-                        <h4 className="text-sm font-black text-slate-900 uppercase tracking-tighter">Detalhamento (Split)</h4>
-                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Desmembrar valor em múltiplos itens</p>
-                     </div>
-                  </div>
-                  <button 
-                     type="button"
-                     onClick={() => setFormData(prev => ({ ...prev, isSplit: !prev.isSplit, splitItems: !prev.isSplit && (!prev.splitItems || prev.splitItems.length === 0) ? [{ id: Math.random().toString(), description: 'Item 1', value: prev.value }] : prev.splitItems }))}
-                     className={`relative w-14 h-8 rounded-full transition-all duration-300 ${formData.isSplit ? 'bg-indigo-600' : 'bg-slate-200'}`}
-                  >
-                     <div className={`absolute top-1 w-6 h-6 bg-white rounded-full shadow-md transition-all duration-300 ${formData.isSplit ? 'right-1' : 'left-1'}`}></div>
-                  </button>
-               </div>
-
-               {formData.isSplit && (
-                 <div className="p-6 md:p-8 space-y-6 animate-in slide-in-from-top-4 duration-500">
-                    <div className="bg-slate-100 rounded-2xl p-4 flex flex-col gap-2">
-                       <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest">
-                          <span className="text-slate-500">Total Validado:</span>
-                          <span className={isSplitValid ? 'text-emerald-600' : 'text-rose-500'}>
-                             {totalSplitValue.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'})} / {formData.value.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'})}
-                          </span>
-                       </div>
-                       <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
-                          <div 
-                            className={`h-full transition-all duration-500 ${isSplitValid ? 'bg-emerald-500' : 'bg-rose-500'}`} 
-                            style={{ width: `${Math.min((totalSplitValue / (formData.value || 1)) * 100, 100)}%` }}
-                          ></div>
-                       </div>
-                       {!isSplitValid && (
-                         <div className="flex items-center gap-2 text-[10px] font-bold text-rose-500 bg-rose-50 px-3 py-2 rounded-lg border border-rose-100">
-                            <AlertCircle size={12} /> {splitError || "Os valores não batem."}
-                         </div>
-                       )}
-                    </div>
-                    <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1 custom-scrollbar">
-                       {(formData.splitItems || []).map((item, idx) => (
-                         <div key={item.id} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row gap-4 items-start md:items-center relative group">
-                            <div className="absolute -left-2 top-1/2 -translate-y-1/2 w-1 h-8 bg-indigo-500 rounded-r-full opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                            <div className="flex-1 w-full">
-                               <input 
-                                 type="text" 
-                                 placeholder={`Item ${idx + 1}`}
-                                 value={item.description}
-                                 onChange={e => updateSplitItem(item.id, 'description', e.target.value)}
-                                 className="w-full text-sm font-bold text-slate-700 placeholder:text-slate-300 outline-none bg-transparent border-b border-transparent focus:border-indigo-200 transition-all"
-                               />
-                            </div>
-                            <div className="w-full md:w-32">
-                               <select 
-                                  value={item.partnerId || ''}
-                                  onChange={e => updateSplitItem(item.id, 'partnerId', e.target.value)}
-                                  className="w-full text-[10px] font-bold text-slate-500 bg-slate-50 rounded-lg px-2 py-1.5 outline-none focus:ring-2 focus:ring-indigo-100"
-                               >
-                                  <option value="">Principal</option>
-                                  {displayPartners.map(p => (
-                                    <option key={p.id} value={p.id}>{p.name.split(' ')[0]}</option>
-                                  ))}
-                               </select>
-                            </div>
-                            <div className="w-full md:w-32 relative">
-                               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-mono">R$</span>
-                               <input 
-                                 type="number"
-                                 step="0.01" 
-                                 value={item.value}
-                                 onChange={e => updateSplitItem(item.id, 'value', parseFloat(e.target.value) || 0)}
-                                 className="w-full pl-8 pr-3 py-2 bg-slate-50 rounded-xl text-sm font-mono font-black text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-100 text-right"
-                               />
-                            </div>
-                            <button 
-                              type="button"
-                              onClick={() => removeSplitItem(item.id)}
-                              className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
-                            >
-                               <Trash2 size={16} />
-                            </button>
-                         </div>
-                       ))}
-                    </div>
-                    <button 
-                      type="button"
-                      onClick={addSplitItem}
-                      className="w-full py-3 border-2 border-dashed border-slate-200 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-indigo-600 hover:border-indigo-200 hover:bg-indigo-50 transition-all flex items-center justify-center gap-2"
-                    >
-                       <Plus size={14} /> Adicionar Detalhe
-                    </button>
-                 </div>
-               )}
-            </div>
-
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
               <div className="space-y-3">
                 <label className="block text-[10px] md:text-[11px] font-black text-slate-400 uppercase tracking-widest px-2">Data de Caixa (Banco)</label>
@@ -353,20 +254,26 @@ const TransactionModal: React.FC<Props> = ({ isOpen, onClose, onSave, categories
               </div>
 
               <div className="space-y-3">
-                <label className="block text-[10px] md:text-[11px] font-black text-slate-400 uppercase tracking-widest px-2">Status Inicial</label>
-                <select 
-                  value={formData.situation}
-                  onChange={e => setFormData({...formData, situation: e.target.value as Situation})}
-                  className="w-full bg-slate-50 border-2 border-slate-100 rounded-3xl px-6 md:px-8 py-4 md:py-5 focus:ring-4 focus:ring-indigo-100 focus:bg-white transition-all outline-none font-bold text-slate-700 appearance-none shadow-inner"
-                >
-                  <option value="PENDENTE">⏳ Aguardando</option>
-                  <option value="PAGO">✅ Finalizado</option>
-                  <option value="AGENDADO">📅 Agendado</option>
-                </select>
+                <label className="block text-[10px] md:text-[11px] font-black text-slate-400 uppercase tracking-widest px-2">Situação Atual</label>
+                <div className="grid grid-cols-3 gap-2">
+                   {[
+                     { id: 'PENDENTE', label: '⏳ Pendente', color: 'bg-amber-50 text-amber-600 border-amber-200' },
+                     { id: 'PAGO', label: '✅ Pago', color: 'bg-emerald-50 text-emerald-600 border-emerald-200' },
+                     { id: 'ATRASADO', label: '❌ Atrasado', color: 'bg-rose-50 text-rose-600 border-rose-200' }
+                   ].map(st => (
+                     <button
+                       key={st.id}
+                       type="button"
+                       onClick={() => setFormData({...formData, situation: st.id as Situation})}
+                       className={`py-3 rounded-2xl text-[9px] font-black uppercase transition-all border-2 ${formData.situation === st.id ? st.color + ' shadow-md scale-105' : 'bg-slate-50 border-slate-100 text-slate-400'}`}
+                     >
+                       {st.label}
+                     </button>
+                   ))}
+                </div>
               </div>
             </div>
 
-            {/* SEÇÃO DE FREQUÊNCIA / PARCELAMENTO (Etapa 3) */}
             <div className="space-y-4">
                <label className="block text-[10px] md:text-[11px] font-black text-slate-400 uppercase tracking-widest px-2">Frequência do Lançamento</label>
                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -393,7 +300,6 @@ const TransactionModal: React.FC<Props> = ({ isOpen, onClose, onSave, categories
                   </button>
                </div>
                
-               {/* Detalhes do Parcelamento */}
                {formData.frequency === 'INSTALLMENT' && (
                  <div className="bg-indigo-50 p-6 rounded-[28px] border border-indigo-100 animate-in slide-in-from-top-2 duration-300">
                     <div className="flex items-center gap-3 mb-4">
@@ -410,35 +316,45 @@ const TransactionModal: React.FC<Props> = ({ isOpen, onClose, onSave, categories
                                max="120"
                                value={formData.installmentTotal || 2}
                                onChange={e => setFormData({...formData, installmentTotal: parseInt(e.target.value) || 2})}
+                               onFocus={(e) => e.target.select()}
                                className="w-full bg-white border-2 border-indigo-100 rounded-xl px-4 py-3 text-indigo-900 font-black outline-none focus:border-indigo-400 text-lg"
                              />
                              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-indigo-300 font-bold text-xs">x</span>
                           </div>
                        </div>
                        <div className="flex-[2] pb-3 text-[10px] font-bold text-indigo-500 leading-relaxed">
-                          O sistema irá gerar <strong>{formData.installmentTotal} lançamentos</strong> futuros automaticamente, com vencimento a cada 30 dias.
+                          Serão gerados {formData.installmentTotal} lançamentos.
                        </div>
                     </div>
                  </div>
                )}
             </div>
-
           </div>
 
-          <div className="flex flex-col md:flex-row gap-4 pt-4">
+          {/* Rodapé de Ações */}
+          <div className="flex flex-col md:flex-row gap-4 pt-6 border-t border-slate-100 mt-4">
+            {initialData && (
+              <button 
+                type="button"
+                onClick={handleDeleteSelf}
+                className="flex-1 py-5 px-10 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-3xl text-[12px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-3 border-2 border-rose-100 shadow-sm"
+              >
+                <Trash2 size={20} /> Apagar Conta
+              </button>
+            )}
             <button 
               type="button"
               onClick={onClose}
-              className="flex-1 py-5 px-10 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-3xl text-[12px] font-black uppercase tracking-widest transition-all"
+              className={`flex-1 py-5 px-10 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-3xl text-[12px] font-black uppercase tracking-widest transition-all ${initialData ? 'hidden md:block' : ''}`}
             >
               Cancelar
             </button>
             <button 
               type="submit"
               disabled={formData.isSplit && !isSplitValid}
-              className="flex-1 py-5 px-10 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-3xl text-[12px] font-black uppercase tracking-widest shadow-2xl flex items-center justify-center gap-3 transition-all transform hover:scale-[1.01] active:scale-95"
+              className="flex-[2] py-5 px-10 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-3xl text-[12px] font-black uppercase tracking-widest shadow-2xl flex items-center justify-center gap-3 transition-all transform hover:scale-[1.01] active:scale-95"
             >
-              <Save size={22} /> {initialData ? 'Atualizar Dados' : 'Lançar no Histórico'}
+              <Save size={22} /> {initialData ? 'Salvar Alterações' : 'Confirmar Lançamento'}
             </button>
           </div>
         </form>
