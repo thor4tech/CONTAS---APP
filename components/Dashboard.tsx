@@ -14,7 +14,7 @@ import ReferralView from './ReferralView';
 import OnboardingWizard from './Onboarding/OnboardingWizard';
 import ConfirmModal from './ConfirmModal';
 import TransactionModal from './TransactionModal';
-import DuplicateModal from './DuplicateModal'; // Importado
+import DuplicateModal from './DuplicateModal';
 import CategoryModal from './CategoryModal';
 import { FloatingInfo } from './FloatingInfo';
 import { 
@@ -94,7 +94,8 @@ const BankRow = ({ item, onUpdateBalance, showValues }: any) => {
   return (
     <div className="flex items-center justify-between p-6 hover:bg-slate-50 rounded-3xl transition-colors group border-b border-slate-50 last:border-0">
        <div className="flex items-center gap-5">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-50 to-indigo-100 flex items-center justify-center text-indigo-600 border border-indigo-200/50 shadow-sm group-hover:scale-105 transition-transform">
+          {/* Ícone 3D Bancário */}
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center text-white border border-white/20 shadow-lg shadow-indigo-500/30 group-hover:scale-105 transition-transform">
              <Building2 size={24} />
           </div>
           <div>
@@ -163,14 +164,19 @@ const CreditCardCompact = ({ item, onUpdateDetail, showValues, onUpdateBalance }
       <div className={`${getCardStyle(item.name)} p-6 rounded-[32px] text-white shadow-lg relative overflow-hidden group transition-transform hover:-translate-y-1 hover:shadow-2xl`}>
          <div className="flex justify-between items-start mb-6">
             <div className="flex items-center gap-3">
-               <div className="p-2 bg-white/10 rounded-xl backdrop-blur-sm shadow-inner border border-white/10">
-                  <CardIcon size={18} className="text-white/90"/>
+               {/* Ícone 3D Cartão */}
+               <div className="p-2.5 bg-gradient-to-br from-white/20 to-white/5 rounded-xl backdrop-blur-md shadow-inner border border-white/20">
+                  <CardIcon size={18} className="text-white drop-shadow-md"/>
                </div>
                <span className="text-xs font-black uppercase tracking-widest truncate max-w-[120px] text-shadow-sm">{item.name}</span>
             </div>
             <button 
                onClick={() => onUpdateDetail('situation', item.situation === 'PAGO' ? 'PENDENTE' : 'PAGO')}
-               className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase border tracking-widest transition-all ${item.situation === 'PAGO' ? 'bg-emerald-50 border-emerald-400 text-white shadow-lg' : 'bg-black/20 border-white/20 text-white/50 hover:bg-black/40 hover:text-white hover:border-white/40'}`}
+               className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase border tracking-widest transition-all shadow-md active:scale-95 ${
+                  item.situation === 'PAGO' 
+                  ? 'bg-emerald-500 border-emerald-400 text-white shadow-emerald-500/30' 
+                  : 'bg-black/20 border-white/20 text-white/50 hover:bg-black/40 hover:text-white hover:border-white/40'
+               }`}
             >
                {item.situation}
             </button>
@@ -242,9 +248,9 @@ const ReservaWidget = ({ value, onChange, showValues }: any) => {
             <div className="flex flex-col gap-1">
                <div className="flex items-center gap-2">
                   <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Reserva de Emergência</span>
-                  <FloatingInfo title="Reserva" text="Valor guardado em conta separada (Cofre/Investimento). Este valor SOMA ao seu patrimônio total." />
+                  <FloatingInfo title="Reserva" text="Valor guardado em conta separada (Cofre/Investimento). Este valor é individual por mês, não acumulativo." />
                </div>
-               <span className="text-[9px] text-emerald-500 font-bold uppercase tracking-widest animate-pulse">● Blindado</span>
+               <span className="text-[9px] text-emerald-500 font-bold uppercase tracking-widest animate-pulse">● Saldo do Mês</span>
             </div>
             
             <div className="p-4 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-2xl text-white shadow-[0_10px_20px_rgba(16,185,129,0.3)] ring-2 ring-white/20 transform group-hover:scale-110 transition-transform duration-500 flex items-center justify-center">
@@ -608,30 +614,34 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
 
   const SidebarContent = () => (
     <>
-      <div className="p-8">
+      <div className="p-8 pb-0">
         <div className="flex items-center gap-3 mb-12">
             <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white font-black shadow-lg shadow-indigo-200">C</div>
             <h1 className="text-sm font-black text-slate-900 uppercase tracking-tighter leading-tight">Cria Gestão <br/><span className="text-indigo-600">Pro</span></h1>
         </div>
-        
-        <nav className="space-y-3">
-            <SidebarItem icon={LayoutDashboard} label="Dashboard" active={appState.view === 'dashboard'} onClick={() => setView('dashboard')} />
-            <SidebarItem icon={BarChart3} label="Estratégia" active={appState.view === 'analytics'} onClick={() => setView('analytics')} />
-            <SidebarItem icon={List} label="Fluxos" active={appState.view === 'transactions'} onClick={() => setView('transactions')} />
-            <SidebarItem icon={Users} label="CRM" active={appState.view === 'partners'} onClick={() => setView('partners')} />
-            <SidebarItem icon={Calendar} label="Agenda" active={appState.view === 'calendar'} onClick={() => setView('calendar')} />
-            <SidebarItem icon={Share2} label="Indicar" active={appState.view === 'referral'} onClick={() => setView('referral')} />
-        </nav>
+      </div>
+      
+      {/* Container de navegação com scroll para telas pequenas */}
+      <div className="flex-1 overflow-y-auto px-8 pb-4 space-y-3 no-scrollbar">
+          <SidebarItem icon={LayoutDashboard} label="Dashboard" active={appState.view === 'dashboard'} onClick={() => setView('dashboard')} />
+          <SidebarItem icon={BarChart3} label="Estratégia" active={appState.view === 'analytics'} onClick={() => setView('analytics')} />
+          <SidebarItem icon={List} label="Fluxos" active={appState.view === 'transactions'} onClick={() => setView('transactions')} />
+          <SidebarItem icon={Users} label="CRM" active={appState.view === 'partners'} onClick={() => setView('partners')} />
+          <SidebarItem icon={Calendar} label="Agenda" active={appState.view === 'calendar'} onClick={() => setView('calendar')} />
+          <SidebarItem icon={Share2} label="Indicar" active={appState.view === 'referral'} onClick={() => setView('referral')} />
+          <div className="pt-2">
+             <SidebarItem icon={Settings} label="Configurações" active={false} onClick={() => setIsSettingsOpen(true)} />
+          </div>
       </div>
 
-      <div className="p-8 border-t border-slate-50 mt-auto">
-        <button onClick={() => setIsSettingsOpen(true)} className="flex items-center gap-4 w-full p-4 rounded-2xl bg-slate-50 hover:bg-slate-100 transition-colors mb-2 border border-slate-100 group">
-            <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 font-bold overflow-hidden border-2 border-white group-hover:border-indigo-100 transition-colors">
+      <div className="p-8 border-t border-slate-50 mt-auto bg-white sticky bottom-0 z-10">
+        <button onClick={() => setIsSettingsOpen(true)} className="flex items-center gap-4 w-full p-4 rounded-2xl bg-slate-50 hover:bg-slate-100 transition-colors border border-slate-100 group">
+            <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 font-bold overflow-hidden border-2 border-white group-hover:border-indigo-100 transition-colors flex-shrink-0">
               {user.photoURL ? <img src={user.photoURL} alt="User" className="w-full h-full object-cover" /> : user.email?.[0].toUpperCase()}
             </div>
-            <div className="text-left overflow-hidden">
+            <div className="text-left overflow-hidden min-w-0">
               <p className="text-[11px] font-black text-slate-900 truncate">{user.displayName || user.email?.split('@')[0]}</p>
-              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Configurar</p>
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Acessar Perfil</p>
             </div>
         </button>
       </div>
@@ -640,7 +650,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
 
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden font-inter">
-      <aside className="hidden lg:flex w-72 bg-white border-r border-slate-100 flex-col justify-between z-20 shadow-xl">
+      <aside className="hidden lg:flex w-72 bg-white border-r border-slate-100 flex-col justify-between z-20 shadow-xl h-full">
          <SidebarContent />
       </aside>
 
@@ -659,7 +669,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
               animate={{ x: 0 }} 
               exit={{ x: '-100%' }}
               transition={{ type: "spring", bounce: 0, duration: 0.4 }}
-              className="fixed inset-y-0 left-0 w-72 bg-white z-50 flex flex-col shadow-2xl lg:hidden"
+              className="fixed inset-y-0 left-0 w-72 bg-white z-50 flex flex-col shadow-2xl lg:hidden h-full"
             >
               <button onClick={() => setIsMobileMenuOpen(false)} className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-900"><X size={24}/></button>
               <SidebarContent />
@@ -670,7 +680,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
 
       <main className="flex-1 flex flex-col h-full overflow-hidden relative">
          <header className="px-6 md:px-8 py-6 bg-white/80 backdrop-blur-md sticky top-0 z-30 flex justify-between items-center border-b border-slate-100">
-            <div className="lg:hidden flex items-center gap-3">
+            <div className="lg:hidden flex items-center gap-3 z-50">
                <button onClick={() => setIsMobileMenuOpen(true)} className="p-2 -ml-2 text-slate-600 hover:bg-slate-100 rounded-lg">
                   <Menu size={24} />
                </button>
@@ -722,8 +732,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                                        <FloatingInfo title="Carteira Global" text="Soma dos saldos bancários + Reserva de Emergência (Patrimônio Total)." />
                                     </div>
                                  </div>
-                                 <div>
-                                    <div className="text-4xl md:text-8xl font-black font-mono tracking-tighter text-white mb-2 leading-none break-all">
+                                 <div className="w-full">
+                                    <div className="text-4xl md:text-5xl lg:text-6xl font-black font-mono tracking-tighter text-white mb-2 leading-none max-w-full truncate">
                                        {showValues ? totals.totalCarteira.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'R$ •••••••'}
                                     </div>
                                     <p className="text-slate-400 text-sm font-medium pl-1">Patrimônio líquido consolidado em todas as contas</p>
