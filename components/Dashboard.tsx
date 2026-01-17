@@ -31,6 +31,16 @@ interface DashboardProps {
   user: any;
 }
 
+// --- HELPER FUNCTION PARA EVITAR ERROS DE DATA ---
+// Transforma "2024-01-15" diretamente em "2024-01" sem usar new Date()
+// Isso evita que o fuso horário (UTC-3) jogue dia 01 para o mês anterior.
+const getSafeMonthId = (dateString: string): string => {
+  if (!dateString) return '';
+  const parts = dateString.split('-'); // [YYYY, MM, DD]
+  if (parts.length < 2) return '';
+  return `${parts[0]}-${parts[1]}`;
+};
+
 // --- SUB-COMPONENTES DE UI ---
 
 const SidebarItem = ({ icon: Icon, label, active, onClick }: any) => (
@@ -387,6 +397,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
     onSnapshot(query(collection(db, `users/${user.uid}/partners`)), snap => setAppState(p => ({ ...p, partners: snap.docs.map(d => d.data() as Partner) })));
   }, [user?.uid]);
 
+  // ID do Mês Atual (para Queries): YYYY-MM
+  // Calculado seguramente para evitar problemas de Timezone
   const currentMonthId = `${appState.currentYear}-${(MONTHS.indexOf(appState.currentMonth) + 1).toString().padStart(2, '0')}`;
   
   const currentMonthData = useMemo(() => {
@@ -510,91 +522,118 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
     setIsClearModalOpen(false);
   };
 
-  // --- FUNÇÃO DE SALVAMENTO BLINDADA (20 FIXES APPLIED) ---
+  // --- RECONSTRUÇÃO TOTAL DA LÓGICA DE SALVAMENTO ---
+  // Elimina uso de 'new Date()' para cálculo de mês. Usa estritamente strings 'YYYY-MM'.
   const handleSaveTransaction = async (transactions: BaseTransaction[], originalTransaction?: BaseTransaction) => {
     if (transactions.length === 0) return;
 
+    console.group("DEBUG: SAVE TRANSACTION START");
+    console.log("Input Transactions:", transactions);
+    console.log("Original Transaction (if editing):", originalTransaction);
+
     try {
-        // [FIX 1] Se for edição de ÚNICO item e a data mudou de mês, precisamos limpar o antigo.
+        // --- ETAPA 1: REMOÇÃO DO REGISTRO ANTIGO (SE EXISTIR E MUDOU DE MÊS) ---
         if (originalTransaction && transactions.length === 1) {
            const newTx = transactions[0];
            
-           // [FIX 2] Parsing seguro de string para evitar erros de Timezone em Jan/Fev
-           // "2026-01-15" -> ["2026", "01"] -> Key: "2026-01"
-           const oldParts = originalTransaction.dueDate.split('-');
-           const newParts = newTx.dueDate.split('-');
-           
-           const oldMonthRef = `${oldParts[0]}-${oldParts[1]}`;
-           const newMonthRef = `${newParts[0]}-${newParts[1]}`;
+           // Extração Segura de ID de Mês (String Split)
+           const oldMonthId = getSafeMonthId(originalTransaction.dueDate);
+           const newMonthId = getSafeMonthId(newTx.dueDate);
 
-           // [FIX 3] Detecção explícita de mudança de mês
-           if (oldMonthRef !== newMonthRef) {
-              const oldDocRef = doc(db, `users/${user.uid}/data`, oldMonthRef);
+           console.log(`Checking Move: Old Month [${oldMonthId}] -> New Month [${newMonthId}]`);
+
+           if (oldMonthId && newMonthId && oldMonthId !== newMonthId) {
+              console.log(">>> MOVING TRANSACTION DETECTED. Deleting from old month...");
+              
+              const oldDocRef = doc(db, `users/${user.uid}/data`, oldMonthId);
               const oldDocSnap = await getDoc(oldDocRef);
               
               if (oldDocSnap.exists()) {
                  const oldData = oldDocSnap.data() as FinancialData;
-                 // [FIX 4] Remove a transação antiga pelo ID
+                 const originalCount = (oldData.transactions || []).length;
+                 
+                 // Filtra removendo o item antigo
                  const filteredTransactions = (oldData.transactions || []).filter(t => t.id !== originalTransaction.id);
                  
-                 // Só grava se realmente houve mudança (para economizar write ops)
-                 if (filteredTransactions.length !== (oldData.transactions || []).length) {
+                 if (filteredTransactions.length < originalCount) {
                     await setDoc(oldDocRef, { ...oldData, transactions: filteredTransactions }, { merge: true });
+                    console.log(">>> SUCCESS: Old transaction deleted from", oldMonthId);
+                 } else {
+                    console.warn(">>> WARNING: Old transaction not found in source month array.");
                  }
+              } else {
+                 console.warn(">>> WARNING: Source month document does not exist.");
               }
            }
         }
 
-        // [FIX 5] Agrupamento por mês de destino para Batch Write
-        const updatesByMonth: Record<string, BaseTransaction[]> = {};
+        // --- ETAPA 2: SALVAMENTO/ATUALIZAÇÃO NOS NOVOS MESES ---
+        // Agrupa por mês de destino para evitar writes duplicados no mesmo doc
+        const batchMap: Record<string, BaseTransaction[]> = {};
         
         transactions.forEach(tx => {
-           // [FIX 6] Garantia de String Splitting para evitar bug do mês 0 (Janeiro)
-           const [yearStr, monthStr] = tx.dueDate.split('-'); 
-           const mId = `${yearStr}-${monthStr}`;
+           const targetMonthId = getSafeMonthId(tx.dueDate); // "2024-01"
+           if (!targetMonthId) {
+             console.error(">>> ERROR: Invalid Date for transaction:", tx);
+             return;
+           }
            
-           const txWithCorrectMonth = { ...tx, monthRef: mId };
-           if (!updatesByMonth[mId]) updatesByMonth[mId] = [];
-           updatesByMonth[mId].push(txWithCorrectMonth);
+           // Garante que o objeto salvo tenha a ref correta
+           const cleanTx = { ...tx, monthRef: targetMonthId };
+           
+           if (!batchMap[targetMonthId]) batchMap[targetMonthId] = [];
+           batchMap[targetMonthId].push(cleanTx);
         });
 
-        // [FIX 7] Processamento Atômico por Mês
-        for (const [mId, newTxs] of Object.entries(updatesByMonth)) {
-           const docRef = doc(db, `users/${user.uid}/data`, mId);
+        console.log("Batch Map for Save:", batchMap);
+
+        // Processa cada mês de destino
+        for (const [monthId, txList] of Object.entries(batchMap)) {
+           console.log(`>>> PROCESSING MONTH: ${monthId} with ${txList.length} items.`);
+           
+           const docRef = doc(db, `users/${user.uid}/data`, monthId);
            const docSnap = await getDoc(docRef);
            
-           let monthDataToUpdate: FinancialData;
+           let currentMonthDoc: FinancialData;
+
            if (docSnap.exists()) {
-              monthDataToUpdate = docSnap.data() as FinancialData;
+              currentMonthDoc = docSnap.data() as FinancialData;
            } else {
-              // [FIX 8] Inicialização segura de novo documento
-              const [yearStr, monthNumStr] = mId.split('-');
-              monthDataToUpdate = { 
+              // Inicializa novo mês se não existir
+              const [yearStr, monthNumStr] = monthId.split('-');
+              const mIndex = parseInt(monthNumStr) - 1; // 0-11
+              console.log(`>>> CREATING NEW MONTH DOC: ${yearStr}-${monthNumStr} (${MONTHS[mIndex]})`);
+              
+              currentMonthDoc = { 
                 ...INITIAL_DATA, 
                 year: parseInt(yearStr), 
-                // [FIX 9] Ajuste de index para label do mês (01 -> Index 0 -> Janeiro)
-                month: MONTHS[parseInt(monthNumStr) - 1] || 'Mês Inválido',
+                month: MONTHS[mIndex] || 'Mês Inválido',
                 transactions: []
               };
            }
 
-           let updatedTransactions = [...(monthDataToUpdate.transactions || [])];
+           let updatedList = [...(currentMonthDoc.transactions || [])];
            
-           // [FIX 10] Merge inteligente (Atualiza se ID existe, Adiciona se novo)
-           newTxs.forEach(newTx => {
-              const index = updatedTransactions.findIndex(t => t.id === newTx.id);
-              if (index !== -1) {
-                 updatedTransactions[index] = newTx;
+           txList.forEach(newTx => {
+              const idx = updatedList.findIndex(t => t.id === newTx.id);
+              if (idx !== -1) {
+                 console.log(`Updating existing item [${newTx.id}] in ${monthId}`);
+                 updatedList[idx] = newTx;
               } else {
-                 updatedTransactions.push(newTx);
+                 console.log(`Adding new item [${newTx.id}] to ${monthId}`);
+                 updatedList.push(newTx);
               }
            });
 
-           await setDoc(docRef, { ...monthDataToUpdate, transactions: updatedTransactions }, { merge: true });
+           await setDoc(docRef, { ...currentMonthDoc, transactions: updatedList }, { merge: true });
+           console.log(`>>> SAVED MONTH ${monthId} SUCCESSFULLY.`);
         }
+
     } catch (error) {
-        console.error("Critical Error saving transaction:", error);
-        alert("Erro de sincronização. Por favor, recarregue a página para evitar dados corrompidos.");
+        console.error("CRITICAL ERROR IN SAVE:", error);
+        alert("Erro crítico ao salvar. Verifique o console para detalhes.");
+    } finally {
+        console.groupEnd();
     }
   };
 

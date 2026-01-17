@@ -127,8 +127,10 @@ const TransactionModal: React.FC<Props> = ({ isOpen, onClose, onSave, onDelete, 
         });
       }
     } else {
-      const [y, m] = formData.dueDate.split('-');
-      const correctMonthRef = `${y}-${m}`;
+      // Usa manipulação de string para garantir ID de mês correto (YYYY-MM)
+      // Evita o problema do Timezone UTC-3 onde dia 01 vira dia 31 do mês anterior
+      const parts = formData.dueDate.split('-'); // [2024, 01, 15]
+      const correctMonthRef = `${parts[0]}-${parts[1]}`;
 
       transactionsToSave.push({
         ...formData,
@@ -141,33 +143,6 @@ const TransactionModal: React.FC<Props> = ({ isOpen, onClose, onSave, onDelete, 
     // IMPORTANTE: Passamos initialData para o Dashboard saber se deve remover do mês antigo
     onSave(transactionsToSave, initialData);
     onClose();
-  };
-
-  const addSplitItem = () => {
-    const newItem: SplitItem = {
-      id: Math.random().toString(36).substr(2, 9),
-      description: '',
-      value: remainingValue > 0 ? remainingValue : 0,
-      partnerId: formData.partnerId
-    };
-    setFormData({
-      ...formData,
-      splitItems: [...(formData.splitItems || []), newItem]
-    });
-  };
-
-  const removeSplitItem = (itemId: string) => {
-    setFormData({
-      ...formData,
-      splitItems: formData.splitItems?.filter(i => i.id !== itemId) || []
-    });
-  };
-
-  const updateSplitItem = (itemId: string, field: keyof SplitItem, value: any) => {
-    setFormData({
-      ...formData,
-      splitItems: formData.splitItems?.map(i => i.id === itemId ? { ...i, [field]: value } : i) || []
-    });
   };
 
   const handleDeleteSelf = () => {
