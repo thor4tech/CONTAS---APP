@@ -23,8 +23,9 @@ const TransactionModal: React.FC<Props> = ({ isOpen, onClose, onSave, onDelete, 
     value: 0,
     categoryId: categories[0]?.id || '',
     partnerId: '',
-    dueDate: new Date().toISOString().split('T')[0],
-    competencyDate: new Date().toISOString().split('T')[0],
+    // Fix: Usa format local para evitar UTC offset bugs na inicialização
+    dueDate: format(new Date(), 'yyyy-MM-dd'),
+    competencyDate: format(new Date(), 'yyyy-MM-dd'),
     monthRef: defaultMonthRef,
     situation: 'PENDENTE' as Situation,
     type: defaultType || 'Despesa',
@@ -51,8 +52,33 @@ const TransactionModal: React.FC<Props> = ({ isOpen, onClose, onSave, onDelete, 
           frequency: initialData.frequency || (initialData.isRecurring ? 'RECURRING' : 'SINGLE')
         });
       } else {
+        // Lógica Inteligente de Data Padrão
+        // Se o usuário está olhando para Janeiro/2024, o modal deve abrir em Janeiro/2024,
+        // mesmo que hoje seja Fevereiro ou Maio.
+        
+        const today = new Date();
+        let targetDateStr = format(today, 'yyyy-MM-dd');
+
+        if (defaultMonthRef) {
+           // defaultMonthRef vem do Dashboard no formato "YYYY-MM"
+           const [viewYearStr, viewMonthStr] = defaultMonthRef.split('-');
+           const viewYear = parseInt(viewYearStr);
+           const viewMonth = parseInt(viewMonthStr); // 1-12
+
+           const currentYear = today.getFullYear();
+           const currentMonth = today.getMonth() + 1; // 1-12
+
+           // Se o mês da tela NÃO for o mês atual real, forçamos a data para dentro do mês da tela.
+           if (viewYear !== currentYear || viewMonth !== currentMonth) {
+              // Mantém o dia atual se possível (ex: dia 15), mas limita a 28 para não quebrar Fevereiro
+              const safeDay = Math.min(today.getDate(), 28);
+              targetDateStr = `${viewYear}-${String(viewMonth).padStart(2, '0')}-${String(safeDay).padStart(2, '0')}`;
+           }
+        }
+
         setFormData({
           ...getInitialState(),
+          dueDate: targetDateStr, // Aplica a data contextualizada
           type: defaultType || 'Despesa',
           monthRef: defaultMonthRef
         });
@@ -87,6 +113,7 @@ const TransactionModal: React.FC<Props> = ({ isOpen, onClose, onSave, onDelete, 
 
     if (formData.frequency === 'INSTALLMENT' && !initialData) {
       const count = formData.installmentTotal || 2;
+      // Usando T12:00:00 para garantir meio-dia e evitar problemas de fuso horário em parcelas
       const startDate = new Date(formData.dueDate + 'T12:00:00');
 
       for (let i = 0; i < count; i++) {
@@ -107,8 +134,10 @@ const TransactionModal: React.FC<Props> = ({ isOpen, onClose, onSave, onDelete, 
         });
       }
     } else {
-      const selectedDate = new Date(formData.dueDate + 'T12:00:00');
-      const correctMonthRef = format(selectedDate, 'yyyy-MM');
+      // Para transações simples, garantimos que o monthRef esteja sincronizado com a data escolhida
+      // O split da string garante que não haja conversão de fuso horário indesejada
+      const [y, m] = formData.dueDate.split('-');
+      const correctMonthRef = `${y}-${m}`;
 
       transactionsToSave.push({
         ...formData,

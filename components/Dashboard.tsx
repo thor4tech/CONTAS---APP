@@ -14,6 +14,7 @@ import ReferralView from './ReferralView';
 import OnboardingWizard from './Onboarding/OnboardingWizard';
 import ConfirmModal from './ConfirmModal';
 import TransactionModal from './TransactionModal';
+import DuplicateModal from './DuplicateModal'; // Importado
 import CategoryModal from './CategoryModal';
 import { FloatingInfo } from './FloatingInfo';
 import { 
@@ -323,6 +324,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
   const [editingTransaction, setEditingTransaction] = useState<BaseTransaction | undefined>(undefined);
   const [defaultTransactionType, setDefaultTransactionType] = useState<'Receita' | 'Despesa'>('Despesa');
   
+  // States para duplicação avançada
+  const [smartDuplicateItems, setSmartDuplicateItems] = useState<BaseTransaction[]>([]);
+  const [isSmartDuplicateOpen, setIsSmartDuplicateOpen] = useState(false);
+
   // Novo estado para exclusão com pop-up
   const [transactionToDeleteId, setTransactionToDeleteId] = useState<string | null>(null);
 
@@ -504,8 +509,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
     const updatesByMonth: Record<string, BaseTransaction[]> = {};
     
     transactions.forEach(tx => {
-       const date = new Date(tx.dueDate + 'T00:00:00');
-       const mId = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
+       const [yearStr, monthStr] = tx.dueDate.split('-'); 
+       const mId = `${yearStr}-${monthStr}`;
+       
        const txWithCorrectMonth = { ...tx, monthRef: mId };
        if (!updatesByMonth[mId]) updatesByMonth[mId] = [];
        updatesByMonth[mId].push(txWithCorrectMonth);
@@ -570,6 +576,28 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
     const mergedTransactions = [...(currentMonthData.transactions || []), ...newTransactions];
     await setDoc(doc(db, `users/${user.uid}/data`, currentMonthId), { ...currentMonthData, transactions: mergedTransactions }, { merge: true });
     setIsDuplicateModalOpen(false);
+  };
+
+  // Prepara itens para duplicação inteligente
+  const openSmartDuplicate = (selectedIds: string[]) => {
+    const items = (currentMonthData.transactions || []).filter(t => selectedIds.includes(t.id));
+    setSmartDuplicateItems(items);
+    setIsSmartDuplicateOpen(true);
+  };
+
+  // Função auxiliar para DuplicateModal ler dados do Firestore
+  const fetchTargetMonthData = async (monthKey: string) => {
+    const docRef = doc(db, `users/${user.uid}/data`, monthKey);
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      return (snap.data() as FinancialData).transactions || [];
+    }
+    return [];
+  };
+
+  // Salva os itens duplicados validados pelo modal
+  const handleSmartDuplicateConfirm = async (targetDate: string, transactionsToSave: BaseTransaction[]) => {
+    await handleSaveTransaction(transactionsToSave);
   };
 
   if (appState.view === 'onboarding') return <OnboardingWizard user={user} onFinish={() => setView('dashboard')} />;
@@ -803,6 +831,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                       showValues={showValues}
                       onDuplicatePrevious={() => setIsDuplicateModalOpen(true)}
                       onClearMonth={() => setIsClearModalOpen(true)}
+                      onSmartDuplicate={openSmartDuplicate}
                     />
                   )}
                   {appState.view === 'analytics' && (
@@ -834,6 +863,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
         initialData={editingTransaction} 
         defaultMonthRef={currentMonthId} 
         defaultType={defaultTransactionType} 
+      />
+
+      <DuplicateModal
+        isOpen={isSmartDuplicateOpen}
+        onClose={() => setIsSmartDuplicateOpen(false)}
+        selectedTransactions={smartDuplicateItems}
+        onConfirm={handleSmartDuplicateConfirm}
+        existingTransactionsInTargetMonth={fetchTargetMonthData}
       />
 
       <ConfirmModal 

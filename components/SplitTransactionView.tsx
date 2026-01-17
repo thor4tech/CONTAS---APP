@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { BaseTransaction, Category, Partner } from '../types';
 import TransactionTable from './TransactionTable';
-import { Copy, Eraser } from 'lucide-react';
+import { Copy, Eraser, CheckSquare } from 'lucide-react';
 
 interface Props {
   transactions: BaseTransaction[];
@@ -18,10 +18,17 @@ interface Props {
   showValues?: boolean;
   onDuplicatePrevious?: () => void;
   onClearMonth?: () => void;
+  onSmartDuplicate?: (selectedIds: string[]) => void;
 }
 
-const SplitTransactionView: React.FC<Props> = ({ transactions, categories, partners, onToggleStatus, onDelete, onEdit, onAddNew, onQuickUpdate, totals, onReorder, showValues = true, onDuplicatePrevious, onClearMonth }) => {
+const SplitTransactionView: React.FC<Props> = ({ 
+  transactions, categories, partners, 
+  onToggleStatus, onDelete, onEdit, onAddNew, onQuickUpdate, 
+  totals, onReorder, showValues = true, 
+  onDuplicatePrevious, onClearMonth, onSmartDuplicate 
+}) => {
   const [activeView, setActiveView] = useState<'both' | 'income' | 'expense'>('both');
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   
   const incomes = transactions.filter(t => t.type === 'Receita');
   const expenses = transactions.filter(t => t.type === 'Despesa');
@@ -35,10 +42,22 @@ const SplitTransactionView: React.FC<Props> = ({ transactions, categories, partn
     }
   };
 
+  const handleSelect = (id: string) => {
+    setSelectedIds(prev => 
+      prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAll = (ids: string[]) => {
+    setSelectedIds(ids);
+  };
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500 w-full max-w-full pb-10">
       {/* Sticky Header Control */}
       <div className="flex flex-col md:flex-row gap-4 md:gap-6 justify-center items-center sticky top-0 z-20 bg-slate-50/90 backdrop-blur-md py-4 border-b border-slate-200/50 -mx-4 px-4 md:mx-0 md:px-0 md:border-none md:bg-transparent md:backdrop-blur-none">
+        
+        {/* View Toggle */}
         <div className="flex p-1 bg-white border border-slate-200 rounded-full shadow-lg w-full max-w-[340px] md:max-w-md">
            <button 
              onClick={() => setActiveView('income')} 
@@ -60,16 +79,27 @@ const SplitTransactionView: React.FC<Props> = ({ transactions, categories, partn
            </button>
         </div>
 
+        {/* Global Actions */}
         <div className="flex items-center gap-3">
-           {onDuplicatePrevious && (
+           {selectedIds.length > 0 && onSmartDuplicate ? (
              <button 
-               onClick={onDuplicatePrevious}
-               className="flex items-center gap-3 px-6 py-3 bg-white border border-indigo-100 text-indigo-600 rounded-full text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-indigo-50 hover:scale-105 active:scale-95 transition-all"
+               onClick={() => { onSmartDuplicate(selectedIds); setSelectedIds([]); }}
+               className="flex items-center gap-3 px-6 py-3 bg-indigo-600 text-white rounded-full text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-indigo-700 hover:scale-105 active:scale-95 transition-all animate-in slide-in-from-right duration-300"
              >
-               <Copy size={14} /> <span className="hidden md:inline">Duplicar Anterior</span>
+               <Copy size={14} /> <span className="hidden md:inline">Duplicar ({selectedIds.length})</span>
              </button>
+           ) : (
+             onDuplicatePrevious && (
+               <button 
+                 onClick={onDuplicatePrevious}
+                 className="flex items-center gap-3 px-6 py-3 bg-white border border-indigo-100 text-indigo-600 rounded-full text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-indigo-50 hover:scale-105 active:scale-95 transition-all"
+               >
+                 <Copy size={14} /> <span className="hidden md:inline">Duplicar Mês</span>
+               </button>
+             )
            )}
-           {onClearMonth && (
+           
+           {onClearMonth && selectedIds.length === 0 && (
              <button 
                onClick={onClearMonth}
                className="flex items-center gap-3 px-6 py-3 bg-white border border-rose-100 text-rose-500 rounded-full text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-rose-50 hover:scale-105 active:scale-95 transition-all"
@@ -96,6 +126,9 @@ const SplitTransactionView: React.FC<Props> = ({ transactions, categories, partn
             onQuickUpdate={onQuickUpdate}
             totals={totals}
             onReorder={(data) => handleReorder('Receita', data)}
+            selectedIds={selectedIds}
+            onSelect={handleSelect}
+            onSelectAll={handleSelectAll}
           />
         </div>
         <div className={`w-full transition-all duration-500 ${activeView === 'income' ? 'hidden' : 'block'}`}>
@@ -113,6 +146,9 @@ const SplitTransactionView: React.FC<Props> = ({ transactions, categories, partn
             onQuickUpdate={onQuickUpdate}
             totals={totals}
             onReorder={(data) => handleReorder('Despesa', data)}
+            selectedIds={selectedIds}
+            onSelect={handleSelect}
+            onSelectAll={handleSelectAll}
           />
         </div>
       </div>

@@ -1,7 +1,7 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { BaseTransaction, Category, Partner, Situation } from '../types';
-import { Trash2, Plus, Edit3, Activity, TrendingUp, TrendingDown, GripVertical, Search, ArrowUpDown, Layers, AlertCircle, CalendarClock, CheckCircle2, Clock, Check, CalendarX } from 'lucide-react';
+import { Trash2, Plus, Edit3, Activity, TrendingUp, TrendingDown, GripVertical, Search, ArrowUpDown, Layers, AlertCircle, CalendarClock, CheckCircle2, Clock, Check, CalendarX, Square, CheckSquare } from 'lucide-react';
 import { FloatingInfo } from './FloatingInfo';
 import { format, isBefore, isSameDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale/pt-BR';
@@ -20,12 +20,22 @@ interface Props {
   totals: any;
   onReorder?: (newData: BaseTransaction[]) => void;
   showValues?: boolean;
+  // Selection Props
+  selectedIds?: string[];
+  onSelect?: (id: string) => void;
+  onSelectAll?: (ids: string[]) => void;
+  isSelectionMode?: boolean;
 }
 
 type SortField = 'date' | 'value' | 'description';
 type SortOrder = 'asc' | 'desc';
 
-const TransactionTable: React.FC<Props> = ({ title, color, data, categories, partners, onToggleStatus, onDelete, onEdit, onAddNew, onQuickUpdate, totals, onReorder, showValues = true }) => {
+const TransactionTable: React.FC<Props> = ({ 
+  title, color, data, categories, partners, 
+  onToggleStatus, onDelete, onEdit, onAddNew, onQuickUpdate, 
+  totals, onReorder, showValues = true,
+  selectedIds = [], onSelect, onSelectAll, isSelectionMode = false 
+}) => {
   const [editingValueId, setEditingValueId] = useState<string | null>(null);
   const [localVal, setLocalVal] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
@@ -91,10 +101,8 @@ const TransactionTable: React.FC<Props> = ({ title, color, data, categories, par
     
     const isPaid = item.situation === 'PAGO';
     const isOverdueState = item.situation === 'ATRASADO';
-    // Logic for auto-detecting overdue if pending
     const isAutoOverdue = !isPaid && isBefore(dueDate, today) && item.situation !== 'ATRASADO';
     const isOverdue = isOverdueState || isAutoOverdue;
-    
     const isScheduled = item.situation === 'AGENDADO';
 
     return { isPaid, isOverdue, isScheduled };
@@ -114,6 +122,23 @@ const TransactionTable: React.FC<Props> = ({ title, color, data, categories, par
     else next = 'PENDENTE';
     
     onQuickUpdate(id, 'situation', next);
+  };
+
+  const allFilteredSelected = filteredAndSortedData.length > 0 && filteredAndSortedData.every(item => selectedIds.includes(item.id));
+
+  const toggleSelectAll = () => {
+    if (onSelectAll) {
+      if (allFilteredSelected) {
+        // Deselect filtered
+        const newSelection = selectedIds.filter(id => !filteredAndSortedData.find(i => i.id === id));
+        onSelectAll(newSelection);
+      } else {
+        // Select all filtered
+        const toAdd = filteredAndSortedData.map(i => i.id);
+        const unique = Array.from(new Set([...selectedIds, ...toAdd]));
+        onSelectAll(unique);
+      }
+    }
   };
 
   return (
@@ -151,16 +176,34 @@ const TransactionTable: React.FC<Props> = ({ title, color, data, categories, par
 
       {/* MOBILE VIEW (CARDS) */}
       <div className="md:hidden flex flex-col gap-4 p-4 bg-slate-50 min-h-[300px]">
+        {/* Select All Mobile */}
+        <div className="flex justify-end px-2">
+           <button onClick={toggleSelectAll} className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-indigo-600 transition-colors">
+              {allFilteredSelected ? <CheckSquare size={16} className="text-indigo-600"/> : <Square size={16}/>}
+              Selecionar Tudo
+           </button>
+        </div>
+
         {filteredAndSortedData.map((item) => {
            const cat = getCategory(item.categoryId);
            const { isPaid, isOverdue } = checkStatus(item);
+           const isSelected = selectedIds.includes(item.id);
+
            return (
-             <div key={item.id} className="bg-white p-5 rounded-[32px] shadow-sm border border-slate-100 flex flex-col gap-4 relative overflow-hidden transition-all hover:shadow-md">
+             <div 
+                key={item.id} 
+                className={`bg-white p-5 rounded-[32px] shadow-sm border flex flex-col gap-4 relative overflow-hidden transition-all duration-300 ${isSelected ? 'border-indigo-500 ring-2 ring-indigo-100 bg-indigo-50/10' : 'border-slate-100'}`}
+             >
+                {/* Checkbox Overlay Area */}
+                <div className="absolute top-4 left-4 z-10" onClick={(e) => { e.stopPropagation(); onSelect && onSelect(item.id); }}>
+                   {isSelected ? <CheckSquare className="text-indigo-600 drop-shadow-md" size={24} /> : <Square className="text-slate-300" size={24} />}
+                </div>
+
                 {/* Indicador Lateral de Status */}
                 <div className={`absolute top-0 right-0 w-2 h-full transition-colors ${isPaid ? 'bg-emerald-500' : isOverdue ? 'bg-rose-500' : 'bg-amber-400'}`}></div>
                 
-                {/* Top: Categoria e Ações Rápidas */}
-                <div className="flex justify-between items-start">
+                {/* Top: Categoria e Ações Rápidas (Padding left para checkbox) */}
+                <div className="flex justify-between items-start pl-8">
                    <div className="flex items-center gap-3 min-w-0">
                       <div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-lg shrink-0 ${cat.color.split(' ')[0]} ${cat.color.split(' ')[1]}`}>
                          {cat.icon}
@@ -176,8 +219,8 @@ const TransactionTable: React.FC<Props> = ({ title, color, data, categories, par
                    </div>
                 </div>
 
-                {/* Valor Centralizado e Grande (Evita Overflow) */}
-                <div className="px-1">
+                {/* Valor Centralizado */}
+                <div className="px-1 pl-8">
                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Valor da Operação</span>
                    {editingValueId === item.id ? (
                       <form onSubmit={(e) => handleSaveValue(item.id, e)} className="flex items-center gap-2 animate-in fade-in zoom-in">
@@ -206,8 +249,7 @@ const TransactionTable: React.FC<Props> = ({ title, color, data, categories, par
                    )}
                 </div>
                 
-                {/* Footer do Card: Data e Botão de Status (3 Estados) */}
-                <div className="flex items-center justify-between pt-4 border-t border-slate-50 mt-1">
+                <div className="flex items-center justify-between pt-4 border-t border-slate-50 mt-1 pl-8">
                    <div className="flex items-center gap-2">
                       <div className={`p-2 rounded-xl ${isOverdue ? 'bg-rose-50 text-rose-500' : 'bg-slate-50 text-slate-400'}`}>
                          <CalendarClock size={14} />
@@ -243,6 +285,11 @@ const TransactionTable: React.FC<Props> = ({ title, color, data, categories, par
         <table className="w-full text-left border-collapse min-w-[800px] table-fixed">
           <thead className="bg-slate-50/50 text-slate-400 text-[9px] font-black uppercase tracking-[0.3em] border-b border-slate-100">
             <tr>
+              <th className="px-6 py-6 w-14 text-center">
+                 <button onClick={toggleSelectAll} className="hover:text-indigo-600 transition-colors">
+                    {allFilteredSelected ? <CheckSquare size={16}/> : <Square size={16}/>}
+                 </button>
+              </th>
               <th className="px-6 py-6 w-14"></th>
               <th className="px-6 py-6 w-32 cursor-pointer hover:text-indigo-600 transition-colors" onClick={() => toggleSort('date')}>
                 <div className="flex items-center gap-2">Data <ArrowUpDown size={10}/></div>
@@ -261,9 +308,19 @@ const TransactionTable: React.FC<Props> = ({ title, color, data, categories, par
             {filteredAndSortedData.map((item) => {
               const cat = getCategory(item.categoryId);
               const { isPaid, isOverdue, isScheduled } = checkStatus(item);
+              const isSelected = selectedIds.includes(item.id);
               
               return (
-                <tr key={item.id} className={`group transition-all cursor-default ${isOverdue ? 'bg-rose-50/30' : isScheduled ? 'opacity-70' : 'hover:bg-indigo-50/20'}`}>
+                <tr 
+                  key={item.id} 
+                  className={`group transition-all cursor-default ${isSelected ? 'bg-indigo-50/40' : isOverdue ? 'bg-rose-50/30' : isScheduled ? 'opacity-70' : 'hover:bg-indigo-50/20'}`}
+                  onClick={() => onSelect && onSelect(item.id)}
+                >
+                  <td className="px-6 py-5 text-center">
+                     <button className={`transition-colors ${isSelected ? 'text-indigo-600' : 'text-slate-300 group-hover:text-slate-400'}`}>
+                        {isSelected ? <CheckSquare size={16}/> : <Square size={16}/>}
+                     </button>
+                  </td>
                   <td className="px-6 py-5 text-slate-200 group-hover:text-indigo-400 transition-colors text-center"><GripVertical size={16} /></td>
                   <td className="px-6 py-5">
                      <div className={`flex items-center gap-2 text-[11px] font-black font-mono tracking-tighter ${isOverdue ? 'text-rose-500' : 'text-slate-500'}`}>
@@ -273,7 +330,7 @@ const TransactionTable: React.FC<Props> = ({ title, color, data, categories, par
                   </td>
                   <td className="px-6 py-5">
                     <div className="flex items-center gap-2 truncate">
-                       <div className={`text-[12px] font-black truncate max-w-[250px] uppercase tracking-tight group-hover:text-indigo-600 transition-colors ${isPaid ? 'text-slate-900 line-through decoration-slate-300 decoration-2' : 'text-slate-900'}`} title={item.description} onClick={() => onEdit(item)}>
+                       <div className={`text-[12px] font-black truncate max-w-[250px] uppercase tracking-tight group-hover:text-indigo-600 transition-colors ${isPaid ? 'text-slate-900 line-through decoration-slate-300 decoration-2' : 'text-slate-900'}`} title={item.description} onClick={(e) => { e.stopPropagation(); onEdit(item); }}>
                          {item.description}
                        </div>
                        {item.isSplit && (
@@ -286,7 +343,7 @@ const TransactionTable: React.FC<Props> = ({ title, color, data, categories, par
                       {cat.icon} {cat.name}
                     </div>
                   </td>
-                  <td className="px-6 py-5">
+                  <td className="px-6 py-5" onClick={(e) => e.stopPropagation()}>
                     {editingValueId === item.id ? (
                       <form onSubmit={(e) => handleSaveValue(item.id, e)} className="flex items-center gap-2">
                         <input 
@@ -311,7 +368,7 @@ const TransactionTable: React.FC<Props> = ({ title, color, data, categories, par
                       </div>
                     )}
                   </td>
-                  <td className="px-6 py-5 text-center">
+                  <td className="px-6 py-5 text-center" onClick={(e) => e.stopPropagation()}>
                     <button 
                       onClick={() => handleCycleStatus(item.id, item.situation)} 
                       className={`px-3 py-2 rounded-full text-[9px] font-black border transition-all shadow-sm flex items-center justify-center gap-1.5 w-full max-w-[120px] mx-auto active:scale-95
@@ -324,7 +381,7 @@ const TransactionTable: React.FC<Props> = ({ title, color, data, categories, par
                       {isPaid ? 'PAGO' : item.situation === 'ATRASADO' ? 'ATRASADO' : 'PENDENTE'}
                     </button>
                   </td>
-                  <td className="px-6 py-5 text-right">
+                  <td className="px-6 py-5 text-right" onClick={(e) => e.stopPropagation()}>
                     <div className="flex justify-end gap-2">
                       <button onClick={() => onEdit(item)} className="p-2.5 bg-slate-50 text-slate-400 hover:text-indigo-600 hover:bg-white hover:shadow-md rounded-xl transition-all"><Edit3 size={16} /></button>
                       <button onClick={() => onDelete(item.id)} className="p-2.5 bg-rose-50 text-rose-300 hover:text-rose-600 hover:bg-white hover:shadow-md rounded-xl transition-all"><Trash2 size={16} /></button>
