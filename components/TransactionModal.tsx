@@ -7,7 +7,7 @@ import { addMonths, format } from 'date-fns';
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (transactions: BaseTransaction[]) => void;
+  onSave: (transactions: BaseTransaction[], originalTransaction?: BaseTransaction) => void;
   onDelete?: (id: string) => void;
   categories: Category[];
   partners?: Partner[];
@@ -53,14 +53,10 @@ const TransactionModal: React.FC<Props> = ({ isOpen, onClose, onSave, onDelete, 
         });
       } else {
         // Lógica Inteligente de Data Padrão
-        // Se o usuário está olhando para Janeiro/2024, o modal deve abrir em Janeiro/2024,
-        // mesmo que hoje seja Fevereiro ou Maio.
-        
         const today = new Date();
         let targetDateStr = format(today, 'yyyy-MM-dd');
 
         if (defaultMonthRef) {
-           // defaultMonthRef vem do Dashboard no formato "YYYY-MM"
            const [viewYearStr, viewMonthStr] = defaultMonthRef.split('-');
            const viewYear = parseInt(viewYearStr);
            const viewMonth = parseInt(viewMonthStr); // 1-12
@@ -68,9 +64,7 @@ const TransactionModal: React.FC<Props> = ({ isOpen, onClose, onSave, onDelete, 
            const currentYear = today.getFullYear();
            const currentMonth = today.getMonth() + 1; // 1-12
 
-           // Se o mês da tela NÃO for o mês atual real, forçamos a data para dentro do mês da tela.
            if (viewYear !== currentYear || viewMonth !== currentMonth) {
-              // Mantém o dia atual se possível (ex: dia 15), mas limita a 28 para não quebrar Fevereiro
               const safeDay = Math.min(today.getDate(), 28);
               targetDateStr = `${viewYear}-${String(viewMonth).padStart(2, '0')}-${String(safeDay).padStart(2, '0')}`;
            }
@@ -78,7 +72,7 @@ const TransactionModal: React.FC<Props> = ({ isOpen, onClose, onSave, onDelete, 
 
         setFormData({
           ...getInitialState(),
-          dueDate: targetDateStr, // Aplica a data contextualizada
+          dueDate: targetDateStr,
           type: defaultType || 'Despesa',
           monthRef: defaultMonthRef
         });
@@ -113,7 +107,6 @@ const TransactionModal: React.FC<Props> = ({ isOpen, onClose, onSave, onDelete, 
 
     if (formData.frequency === 'INSTALLMENT' && !initialData) {
       const count = formData.installmentTotal || 2;
-      // Usando T12:00:00 para garantir meio-dia e evitar problemas de fuso horário em parcelas
       const startDate = new Date(formData.dueDate + 'T12:00:00');
 
       for (let i = 0; i < count; i++) {
@@ -134,8 +127,6 @@ const TransactionModal: React.FC<Props> = ({ isOpen, onClose, onSave, onDelete, 
         });
       }
     } else {
-      // Para transações simples, garantimos que o monthRef esteja sincronizado com a data escolhida
-      // O split da string garante que não haja conversão de fuso horário indesejada
       const [y, m] = formData.dueDate.split('-');
       const correctMonthRef = `${y}-${m}`;
 
@@ -147,7 +138,8 @@ const TransactionModal: React.FC<Props> = ({ isOpen, onClose, onSave, onDelete, 
       });
     }
 
-    onSave(transactionsToSave);
+    // IMPORTANTE: Passamos initialData para o Dashboard saber se deve remover do mês antigo
+    onSave(transactionsToSave, initialData);
     onClose();
   };
 
@@ -228,7 +220,7 @@ const TransactionModal: React.FC<Props> = ({ isOpen, onClose, onSave, onDelete, 
                 <label className="block text-[10px] md:text-[11px] font-black text-slate-400 uppercase tracking-widest px-2">
                    {formData.frequency === 'INSTALLMENT' ? 'Valor da Parcela (R$)' : 'Valor Total (R$)'}
                 </label>
-                <div className="relative group flex items-center bg-slate-50 border-2 border-slate-100 rounded-3xl px-6 md:px-8 py-4 md:py-5 focus-within:ring-4 focus-within:ring-indigo-100 focus-within:bg-white transition-all">
+                <div className="relative group flex items-center bg-slate-50 border-2 border-slate-100 rounded-3xl px-6 md:px-8 py-4 md:py-5 focus:within:ring-4 focus:within:ring-indigo-100 focus:within:bg-white transition-all">
                   <span className="text-slate-300 font-bold text-xl mr-4 font-mono select-none">R$</span>
                   <input 
                     required

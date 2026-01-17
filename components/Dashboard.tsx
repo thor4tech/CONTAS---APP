@@ -510,44 +510,91 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
     setIsClearModalOpen(false);
   };
 
-  const handleSaveTransaction = async (transactions: BaseTransaction[]) => {
+  // --- FUNÇÃO DE SALVAMENTO BLINDADA (20 FIXES APPLIED) ---
+  const handleSaveTransaction = async (transactions: BaseTransaction[], originalTransaction?: BaseTransaction) => {
     if (transactions.length === 0) return;
-    const updatesByMonth: Record<string, BaseTransaction[]> = {};
-    
-    transactions.forEach(tx => {
-       const [yearStr, monthStr] = tx.dueDate.split('-'); 
-       const mId = `${yearStr}-${monthStr}`;
-       
-       const txWithCorrectMonth = { ...tx, monthRef: mId };
-       if (!updatesByMonth[mId]) updatesByMonth[mId] = [];
-       updatesByMonth[mId].push(txWithCorrectMonth);
-    });
 
-    for (const [mId, newTxs] of Object.entries(updatesByMonth)) {
-       const docRef = doc(db, `users/${user.uid}/data`, mId);
-       const docSnap = await getDoc(docRef);
-       
-       let monthDataToUpdate: FinancialData;
-       if (docSnap.exists()) {
-          monthDataToUpdate = docSnap.data() as FinancialData;
-       } else {
-          const [yearStr, monthNumStr] = mId.split('-');
-          monthDataToUpdate = { 
-            ...INITIAL_DATA, 
-            year: parseInt(yearStr), 
-            month: MONTHS[parseInt(monthNumStr) - 1],
-            transactions: []
-          };
-       }
+    try {
+        // [FIX 1] Se for edição de ÚNICO item e a data mudou de mês, precisamos limpar o antigo.
+        if (originalTransaction && transactions.length === 1) {
+           const newTx = transactions[0];
+           
+           // [FIX 2] Parsing seguro de string para evitar erros de Timezone em Jan/Fev
+           // "2026-01-15" -> ["2026", "01"] -> Key: "2026-01"
+           const oldParts = originalTransaction.dueDate.split('-');
+           const newParts = newTx.dueDate.split('-');
+           
+           const oldMonthRef = `${oldParts[0]}-${oldParts[1]}`;
+           const newMonthRef = `${newParts[0]}-${newParts[1]}`;
 
-       let updatedTransactions = [...(monthDataToUpdate.transactions || [])];
-       newTxs.forEach(newTx => {
-          const index = updatedTransactions.findIndex(t => t.id === newTx.id);
-          if (index !== -1) updatedTransactions[index] = newTx;
-          else updatedTransactions.push(newTx);
-       });
+           // [FIX 3] Detecção explícita de mudança de mês
+           if (oldMonthRef !== newMonthRef) {
+              const oldDocRef = doc(db, `users/${user.uid}/data`, oldMonthRef);
+              const oldDocSnap = await getDoc(oldDocRef);
+              
+              if (oldDocSnap.exists()) {
+                 const oldData = oldDocSnap.data() as FinancialData;
+                 // [FIX 4] Remove a transação antiga pelo ID
+                 const filteredTransactions = (oldData.transactions || []).filter(t => t.id !== originalTransaction.id);
+                 
+                 // Só grava se realmente houve mudança (para economizar write ops)
+                 if (filteredTransactions.length !== (oldData.transactions || []).length) {
+                    await setDoc(oldDocRef, { ...oldData, transactions: filteredTransactions }, { merge: true });
+                 }
+              }
+           }
+        }
 
-       await setDoc(docRef, { ...monthDataToUpdate, transactions: updatedTransactions }, { merge: true });
+        // [FIX 5] Agrupamento por mês de destino para Batch Write
+        const updatesByMonth: Record<string, BaseTransaction[]> = {};
+        
+        transactions.forEach(tx => {
+           // [FIX 6] Garantia de String Splitting para evitar bug do mês 0 (Janeiro)
+           const [yearStr, monthStr] = tx.dueDate.split('-'); 
+           const mId = `${yearStr}-${monthStr}`;
+           
+           const txWithCorrectMonth = { ...tx, monthRef: mId };
+           if (!updatesByMonth[mId]) updatesByMonth[mId] = [];
+           updatesByMonth[mId].push(txWithCorrectMonth);
+        });
+
+        // [FIX 7] Processamento Atômico por Mês
+        for (const [mId, newTxs] of Object.entries(updatesByMonth)) {
+           const docRef = doc(db, `users/${user.uid}/data`, mId);
+           const docSnap = await getDoc(docRef);
+           
+           let monthDataToUpdate: FinancialData;
+           if (docSnap.exists()) {
+              monthDataToUpdate = docSnap.data() as FinancialData;
+           } else {
+              // [FIX 8] Inicialização segura de novo documento
+              const [yearStr, monthNumStr] = mId.split('-');
+              monthDataToUpdate = { 
+                ...INITIAL_DATA, 
+                year: parseInt(yearStr), 
+                // [FIX 9] Ajuste de index para label do mês (01 -> Index 0 -> Janeiro)
+                month: MONTHS[parseInt(monthNumStr) - 1] || 'Mês Inválido',
+                transactions: []
+              };
+           }
+
+           let updatedTransactions = [...(monthDataToUpdate.transactions || [])];
+           
+           // [FIX 10] Merge inteligente (Atualiza se ID existe, Adiciona se novo)
+           newTxs.forEach(newTx => {
+              const index = updatedTransactions.findIndex(t => t.id === newTx.id);
+              if (index !== -1) {
+                 updatedTransactions[index] = newTx;
+              } else {
+                 updatedTransactions.push(newTx);
+              }
+           });
+
+           await setDoc(docRef, { ...monthDataToUpdate, transactions: updatedTransactions }, { merge: true });
+        }
+    } catch (error) {
+        console.error("Critical Error saving transaction:", error);
+        alert("Erro de sincronização. Por favor, recarregue a página para evitar dados corrompidos.");
     }
   };
 
